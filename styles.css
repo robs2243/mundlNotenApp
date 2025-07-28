@@ -1,0 +1,169 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 Helvetica, Arial, sans-serif, "Apple Color Emoji",
+                 "Segoe UI Emoji", "Segoe UI Symbol";
+    background-color: #f4f4f9;
+}
+
+.header-controls {
+    background-color: #fff;
+    padding: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    margin-bottom: 15px;
+}
+
+.header-controls h1 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 1.5em;
+}
+
+#status {
+    padding: 8px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    text-align: center;
+    font-weight: bold;
+    color: white;
+    font-size: 0.9em;
+}
+
+.controls-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    align-items: end;
+}
+
+.controls-grid label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #555;
+    font-size: 0.9em;
+}
+
+.controls-grid input,
+.controls-grid select {
+    width: 100%;
+    padding: 8px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+
+.controls-grid input[type="file"] {
+    display: none;
+}
+
+.controls-grid label[for="imageUpload"] {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+    padding: 8px;
+    background-color: #007bff;
+    color: white;
+    text-align: center;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+.controls-grid label[for="imageUpload"]:hover {
+    background-color: #0056b3;
+}
+
+.controls-grid label[for="imageUpload"]::after {
+    content: 'Bilder hochladen';
+    display: block;
+}
+
+@media (max-width: 600px) {
+    .header-controls {
+        padding: 10px;
+    }
+
+    .header-controls h1 {
+        font-size: 1.2em;
+    }
+
+    .controls-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .controls-grid input,
+    .controls-grid select {
+        padding: 6px;
+    }
+
+    #status {
+        font-size: 0.85em;
+    }
+}
+
+.parent {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding: 10px;
+}
+
+.redBox {
+    aspect-ratio: 4 / 3;
+    background-color: #ddd;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.redBox:hover {
+    transform: scale(1.03);
+}
+
+.redBox img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+@media (orientation: landscape) {
+    .parent {
+        grid-template-columns: repeat(8, 1fr);
+    }
+}
+
+.redBox.bild-selektiert {
+    box-sizing: border-box;
+    border: 4px solid #007bff;
+}
+
+.swal2-form { text-align: left; }
+.swal2-radio-group {
+    display: flex; flex-wrap: wrap; justify-content: center;
+    gap: 10px; margin-bottom: 20px;
+}
+.swal2-radio-group label {
+    margin: 0; padding: 5px 10px; border: 1px solid #ddd;
+    border-radius: 5px; cursor: pointer; transition: background 0.2s;
+}
+.swal2-radio-group input { display: none; }
+.swal2-radio-group input:checked + span { font-weight: bold; color: #007bff; }
+#comment-suggestions-container {
+    margin-top: 10px; display: flex; flex-wrap: wrap;
+    gap: 8px; align-items: center;
+}
+.suggestion-item {
+    background-color: #f0f0f0; padding: 4px 8px; border-radius: 12px;
+    font-size: 0.9em; cursor: pointer; border: 1px solid #ccc;
+    transition: background 0.2s;
+}
+.suggestion-item:hover { background-color: #e0e0e0; }
