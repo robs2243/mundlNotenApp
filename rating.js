@@ -26,11 +26,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const dateSelector = document.getElementById('dateSelector');
     const grid = document.querySelector('.parent');
 
+    //Button for uploading pictures
+    const picsUploadButton = document.getElementById('picsUpload');
+
     // App State
     const letzteKommentare = new Set();
     let localGradesCache = {}; // Cache for decrypted grades for the current session
 
     // --- 1. AUTHENTICATION & INITIALIZATION ---
+
+    picsUploadButton.addEventListener('click', () => {
+         window.location.href = 'picsupload.html';
+    })
 
     async function autoLogin() {
         try {
