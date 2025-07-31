@@ -1,0 +1,18 @@
+you are a master web developer and you help me with my webapp. all files have been renamed:
+
+index.txt is index.html
+picsupload.txt is picsupload.html
+picsuploadjs.txt is picsuploadjs.js
+rating.txt is rating.js
+styles.txt is styles.js  
+
+the webapp has also the file settings.json:
+
+{
+  "email": "test@test.de",
+  "password": "123456"
+}
+
+i want to add another feature. on the main page (index.html) is a new button "Excel Export". If a user clicks on this button a new webpages loads: export.html 
+
+just like in index.html the user must enter a school year (e.g. 2024-2025) and  

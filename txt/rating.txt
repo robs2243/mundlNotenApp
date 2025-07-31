@@ -107,7 +107,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return new TextDecoder().decode(decrypted);
     }
 
-    // --- 3. STUDENT IMAGE LOADING ---
 
     async function loadStudentImages() {
         const encPassword = document.getElementById('encryptionPassword').value;
@@ -158,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (i < studentIds.length) {
                         const studentId = studentIds[i];
                         const studentData = students[studentId];
-                        const { vorname, nachname, encryptedData, schuljahr } = studentData;
+                        const { vorname, nachname, encryptedData } = studentData;
                         
                         console.log(`Processing student: ${vorname} ${nachname} (ID: ${studentId}) for box ${i}`);
                         
@@ -167,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             box.dataset.vorname = vorname;
                             box.dataset.nachname = nachname;
                             box.dataset.klasse = classId;
-                            box.dataset.schuljahr = schuljahr; // Add school year
+                            box.dataset.schuljahr = schoolYearPath;
                             
                             // Update the alt text to show the actual student name
                             img.alt = `${vorname} ${nachname}`;
@@ -251,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return decrypted; // Returns ArrayBuffer
     }
 
-    // --- 4. CORE APPLICATION LOGIC ---
+    // --- 3. CORE APPLICATION LOGIC ---
     grid.addEventListener('click', async (e) => {
         const box = e.target.closest('.redBox');
         if (!box) return;
@@ -378,23 +377,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     const encryptedData = await encrypt(payload, encPassword);
                     const gradeId = `${studentId}_${date}_${classId}`;
-                    
-                    // Get student data from the box dataset
-                    const nachname = box.dataset.nachname;
-                    const vorname = box.dataset.vorname;
-                    const schuljahr = box.dataset.schuljahr;
-                    
                     const newGradeData = {
                         studentId,
                         classId,
                         date,
                         studentId_date_class: gradeId,
-                        encryptedData,
-                        nachname,        // Add last name
-                        vorname,         // Add first name
-                        schuljahr        // Add school year
+                        encryptedData
                     };
-                    
                     await set(ref(database, 'grades/' + gradeId), newGradeData);
                     if (comment) letzteKommentare.add(comment);
                     localGradesCache[studentId] = { note, comment };
@@ -404,8 +393,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
-
-    // --- 5. EVENT LISTENERS ---
 
     // Load classes when school year changes
     document.getElementById('schoolYear').addEventListener('input', () => {
@@ -442,15 +429,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Excel Export Button
-    const excelExportButton = document.getElementById('excelExport');
-        if (excelExportButton) {
-            excelExportButton.addEventListener('click', () => {
-                window.location.href = 'export.html';
-            });
-    }
-
-
     // Load images after successful login
     onAuthStateChanged(auth, (user) => {
         if (user) {
@@ -469,8 +447,6 @@ document.addEventListener('DOMContentLoaded', () => {
             statusDiv.style.backgroundColor = '#f44336'; // Red
         }
     });
-
-    // --- 6. HELPER FUNCTIONS ---
 
     async function loadClassesForSchoolYear() {
         const schoolYear = document.getElementById('schoolYear').value.trim();
@@ -566,4 +542,5 @@ document.addEventListener('DOMContentLoaded', () => {
         
         console.log("All images, labels and metadata reset to empty boxes");
     }
+
 });
