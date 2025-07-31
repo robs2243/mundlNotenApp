@@ -32,6 +32,9 @@
             <div>
                 <button id="picsUpload">Bilder hochladen</button>
             </div>
+            <div>
+                <button id="excelExport">Excel Export</button>
+            </div>
         </div>
     </div>
 
