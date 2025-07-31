@@ -16,10 +16,13 @@
                 <input type="password" id="encryptionPassword" placeholder="Geheimes Passwort eingeben">
             </div>
             <div>
+                <label for="schoolYear">Schuljahr</label>
+                <input type="text" id="schoolYear" placeholder="z.B. 2024-2025">
+            </div>
+            <div>
                 <label for="classSelector">Klasse</label>
                 <select id="classSelector">
-                    <option value="E1ME2">E1ME2</option>
-                    <option value="A2IT5">A2IT5</option>
+                    
                 </select>
             </div>
             <div>
@@ -34,38 +37,126 @@
 
     <div class="parent">
         <!-- 32 boxes with unique ids -->
-        <div class="redBox" id="bild-0" data-student-id="Mike_Miller"><img src="../pics/1.jpg" alt="Mike Miller"></div>
-        <div class="redBox" id="bild-1" data-student-id="Julia_Huber"><img src="../pics/2.jpg" alt="Julia Huber"></div>
-        <div class="redBox" id="bild-2" data-student-id="Peter_Pan"><img src="../pics/3.jpg" alt="Peter Pan"></div>
-        <div class="redBox" id="bild-3" data-student-id="Student_4"><img src="../pics/4.jpg" alt="Student 4"></div>
-        <div class="redBox" id="bild-4" data-student-id="Student_5"><img src="../pics/5.jpg" alt="Student 5"></div>
-        <div class="redBox" id="bild-5" data-student-id="Student_6"><img src="../pics/6.jpg" alt="Student 6"></div>
-        <div class="redBox" id="bild-6" data-student-id="Student_7"><img src="../pics/7.jpg" alt="Student 7"></div>
-        <div class="redBox" id="bild-7" data-student-id="Student_8"><img src="../pics/8.jpg" alt="Student 8"></div>
-        <div class="redBox" id="bild-8" data-student-id="Student_9"><img src="../pics/9.jpg" alt="Student 9"></div>
-        <div class="redBox" id="bild-9" data-student-id="Student_10"><img src="../pics/10.jpg" alt="Student 10"></div>
-        <div class="redBox" id="bild-10" data-student-id="Student_11"><img src="../pics/11.jpg" alt="Student 11"></div>
-        <div class="redBox" id="bild-11" data-student-id="Student_12"><img src="../pics/12.jpg" alt="Student 12"></div>
-        <div class="redBox" id="bild-12" data-student-id="Student_13"><img src="../pics/13.jpg" alt="Student 13"></div>
-        <div class="redBox" id="bild-13" data-student-id="Student_14"><img src="../pics/14.jpg" alt="Student 14"></div>
-        <div class="redBox" id="bild-14" data-student-id="Student_15"><img src="../pics/15.jpg" alt="Student 15"></div>
-        <div class="redBox" id="bild-15" data-student-id="Student_16"><img src="../pics/16.jpg" alt="Student 16"></div>
-        <div class="redBox" id="bild-16" data-student-id="Student_17"><img src="../pics/17.jpg" alt="Student 17"></div>
-        <div class="redBox" id="bild-17" data-student-id="Student_18"><img src="../pics/18.jpg" alt="Student 18"></div>
-        <div class="redBox" id="bild-18" data-student-id="Student_19"><img src="../pics/19.jpg" alt="Student 19"></div>
-        <div class="redBox" id="bild-19" data-student-id="Student_20"><img src="../pics/20.jpg" alt="Student 20"></div>
-        <div class="redBox" id="bild-20" data-student-id="Student_21"><img src="../pics/21.jpg" alt="Student 21"></div>
-        <div class="redBox" id="bild-21" data-student-id="Student_22"><img src="../pics/22.jpg" alt="Student 22"></div>
-        <div class="redBox" id="bild-22" data-student-id="Student_23"><img src="../pics/23.jpg" alt="Student 23"></div>
-        <div class="redBox" id="bild-23" data-student-id="Student_24"><img src="../pics/24.jpg" alt="Student 24"></div>
-        <div class="redBox" id="bild-24" data-student-id="Student_25"><img src="../pics/25.jpg" alt="Student 25"></div>
-        <div class="redBox" id="bild-25" data-student-id="Student_26"><img src="../pics/26.jpg" alt="Student 26"></div>
-        <div class="redBox" id="bild-26" data-student-id="Student_27"><img src="../pics/27.jpg" alt="Student 27"></div>
-        <div class="redBox" id="bild-27" data-student-id="Student_28"><img src="../pics/28.jpg" alt="Student 28"></div>
-        <div class="redBox" id="bild-28" data-student-id="Student_29"><img src="../pics/29.jpg" alt="Student 29"></div>
-        <div class="redBox" id="bild-29" data-student-id="Student_30"><img src="../pics/30.jpg" alt="Student 30"></div>
-        <div class="redBox" id="bild-30" data-student-id="Student_31"><img src="../pics/31.jpg" alt="Student 31"></div>
-        <div class="redBox" id="bild-31" data-student-id="Student_32"><img src="../pics/32.jpg" alt="Student 32"></div>
+        <div class="redBox" id="bild-0" data-student-id="Student_1">
+            <img src="" alt="Student 1">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-1" data-student-id="Student_2">
+            <img src="" alt="Student 2">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-2" data-student-id="Student_3">
+            <img src="" alt="Student 3">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-3" data-student-id="Student_4">
+            <img src="" alt="Student 4">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-4" data-student-id="Student_5">
+            <img src="" alt="Student 5">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-5" data-student-id="Student_6">
+            <img src="" alt="Student 6">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-6" data-student-id="Student_7">
+            <img src="" alt="Student 7">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-7" data-student-id="Student_8">
+            <img src="" alt="Student 8">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-8" data-student-id="Student_9">
+            <img src="" alt="Student 9">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-9" data-student-id="Student_10">
+            <img src="" alt="Student 10">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-10" data-student-id="Student_11">
+            <img src="" alt="Student 12">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-12" data-student-id="Student_13">
+            <img src="" alt="Student 13">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-13" data-student-id="Student_14">
+            <img src="" alt="Student 15">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-15" data-student-id="Student_16">
+            <img src="" alt="Student 16">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-16" data-student-id="Student_17">
+            <img src="" alt="Student 17">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-17" data-student-id="Student_18">
+            <img src="" alt="Student 18">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-18" data-student-id="Student_19">
+            <img src="" alt="Student 19">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-19" data-student-id="Student_20">
+            <img src="" alt="Student 20">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-20" data-student-id="Student_21">
+            <img src="" alt="Student 21">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-21" data-student-id="Student_22">
+            <img src="" alt="Student 22">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-22" data-student-id="Student_23">
+            <img src="" alt="Student 23">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-23" data-student-id="Student_24">
+            <img src="" alt="Student 24">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-24" data-student-id="Student_25">
+            <img src="" alt="Student 25">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-25" data-student-id="Student_26">
+            <img src="" alt="Student 26">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-26" data-student-id="Student_27">
+            <img src="" alt="Student 27">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-27" data-student-id="Student_28">
+            <img src="" alt="Student 28">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-28" data-student-id="Student_29">
+            <img src="" alt="Student 29">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-29" data-student-id="Student_30">
+            <img src="" alt="Student 30">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-30" data-student-id="Student_31">
+            <img src="" alt="Student 31">
+            <div class="student-label"></div>
+        </div>
+        <div class="redBox" id="bild-31" data-student-id="Student_32">
+            <img src="" alt="Student 32">
+            <div class="student-label"></div>
+        </div>
     </div>
 
     <!-- Scripts -->
