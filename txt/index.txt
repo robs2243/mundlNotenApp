@@ -21,18 +21,14 @@
             </div>
             <div>
                 <label for="classSelector">Klasse</label>
-                <select id="classSelector">
-                    
-                </select>
+                <select id="classSelector"></select>
             </div>
             <div>
                 <label for="dateSelector">Datum</label>
                 <input type="date" id="dateSelector">
             </div>
-            <div>
+            <div class="button-group">
                 <button id="picsUpload">Bilder hochladen</button>
-            </div>
-            <div>
                 <button id="excelExport">Excel Export</button>
             </div>
         </div>

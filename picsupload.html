@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bilder hochladen</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="picsupload-styles.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script type="module" src="picsuploadjs.js"></script>
 </head>
@@ -28,12 +28,13 @@
             <div>
                 <label for="imageUpload">Bilder auswählen (mehrere möglich, Format: Nachname_Vorname.jpg)</label>
                 <input type="file" id="imageUpload" accept="image/*" multiple>
-                <div id="previewContainer" style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px;"></div> <!-- Vorschau für mehrere -->
+                <div id="previewContainer"></div> <!-- Vorschau für mehrere -->
             </div>
-            <button id="uploadButton">Hochladen</button>
+            <div class="button-container">
+                <button id="backButton">Zurück zur Hauptseite</button>
+                <button id="uploadButton">Hochladen</button>
+            </div>
         </div>
     </div>
-
-    <button id="backButton" style="margin: 15px; padding: 8px 16px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">Zurück zur Hauptseite</button>
 </body>
 </html>

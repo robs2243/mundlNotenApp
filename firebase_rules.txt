@@ -1,0 +1,13 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    "grades": {
+      ".indexOn": ["schuljahr", "classId", "studentId_date_class"],
+      "$grade": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    }
+  }
+}
