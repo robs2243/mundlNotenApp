@@ -98,6 +98,37 @@ html, body {
     grid-column: 1 / -1; /* Span all columns */
 }
 
+/* Upload and Back Buttons */
+#uploadButton,
+#backButton {
+    flex-grow: 1; /* Allows buttons to share space equally */
+    padding: 5px;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: bold;
+    transition: background-color 0.2s;
+    margin-bottom: 5px;
+}
+
+#uploadButton {
+    background-color: #28a745;
+}
+
+#uploadButton:hover {
+    background-color: #218838;
+}
+
+#backButton {
+    background-color: #007bff;
+}
+
+#backButton:hover {
+    background-color: #0056b3;
+}
+
 /* Preview Container Styling */
 #previewContainer {
     display: flex;
@@ -111,27 +142,4 @@ html, body {
     border: 1px solid #ccc;
     border-radius: 5px;
     object-fit: cover;
-}
-
-/* --- Shared buttons across the app (match styles.css) --- */
-.btn {
-    padding: 10px;
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 1em;
-    font-weight: bold;
-    transition: background-color 0.2s;
-}
-.btn-primary { background-color: #007bff; }
-.btn-primary:hover { background-color: #0056b3; }
-.btn-success { background-color: #28a745; }
-.btn-success:hover { background-color: #218838; }
-
-/* Ensure buttons in .button-group sit side-by-side (no full-width) */
-.button-group .btn {
-    flex: 0 0 auto;
-    width: auto;
-    white-space: nowrap;
 }

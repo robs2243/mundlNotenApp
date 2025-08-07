@@ -36,8 +36,8 @@ html, body {
 /* Grid Layout for Controls */
 .controls-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 15px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
     align-items: end;
 }
 
@@ -63,7 +63,6 @@ html, body {
 .button-group {
     display: flex;
     gap: 10px;
-    grid-column: 1 / -1;
 }
 
 /* Upload and Export Buttons */
@@ -241,46 +240,3 @@ html, body {
         width: 100%;  /* full width for smaller screens */
     }
 }
-
-/* --- Shared buttons across the app --- */
-.btn {
-    padding: 10px;
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 1em;
-    font-weight: bold;
-    transition: background-color 0.2s;
-}
-.btn-primary { background-color: #007bff; }
-.btn-primary:hover { background-color: #0056b3; }
-.btn-success { background-color: #28a745; }
-.btn-success:hover { background-color: #218838; }
-
-
-/* --- DATEI-UPLOAD STYLING --- */
-
-/* Versteckt den Standard "Durchsuchen..."-Button */
-.controls-grid input[type="file"] {
-    display: none;
-}
-
-/* Gestaltet das Label wie einen Button */
-.controls-grid label[for="imageUpload"] {
-    background-color: #007bff;
-    color: white;
-    padding: 10px;
-    text-align: center;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    font-weight: normal;
-    margin-top: auto;
-}
-
-.controls-grid label[for="imageUpload"]:hover {
-    background-color: #0056b3;
-}
-
-/* --- ENDE DATEI-UPLOAD STYLING --- */
