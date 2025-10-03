@@ -1,218 +1,513 @@
-// Import necessary modules from Firebase SDK
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
-import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { getDatabase, ref, set } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js';
+/**
+ * ============================================================================
+ * PICTURE UPLOAD PAGE CONTROLLER
+ * ============================================================================
+ * This module handles the student picture upload page using OOP principles.
+ *
+ * Classes:
+ * - ImageUploadService: Manages encrypting and uploading student images
+ * - UploadUIController: Manages UI state and interactions
+ * - UploadPageApp: Main application controller that coordinates everything
+ * ============================================================================
+ */
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Firebase Config (kopiert)
-    const firebaseConfig = {
-        apiKey: "AIzaSyCsI95RxiBk9GXaDpA39oJcyaPtVczr_Q4",
-        authDomain: "mundlnotendb.firebaseapp.com",
-        databaseURL: "https://mundlnotendb-default-rtdb.europe-west1.firebasedatabase.app",
-        projectId: "mundlnotendb",
-        storageBucket: "mundlnotendb.firebasestorage.app",
-        messagingSenderId: "282603615680",
-        appId: "1:282603615680:web:cfda956d14c3bcc6218425"
-    };
+import { FirebaseService, AuthService, CryptoService, Student } from './services.js';
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const database = getDatabase(app);
+/**
+ * ============================================================================
+ * IMAGE UPLOAD SERVICE CLASS
+ * ============================================================================
+ * Handles encrypting and uploading student images to Firebase.
+ *
+ * Responsibilities:
+ * - Validate image filenames
+ * - Encrypt images
+ * - Upload encrypted images to database
+ * - Track upload progress
+ */
+class ImageUploadService {
+    /**
+     * Service instances
+     */
+    #firebaseService;
+    #cryptoService;
 
-    // DOM Elements
-    const statusDiv = document.getElementById('status');
-    const encryptionPassword = document.getElementById('encryptionPassword');
-    const schoolYearInput = document.getElementById('schoolYear');
-    const classSelector = document.getElementById('classSelector');
-    const imageUpload = document.getElementById('imageUpload');
-    const previewContainer = document.getElementById('previewContainer');
-    const uploadButton = document.getElementById('uploadButton');
-    const backButton = document.getElementById('backButton');
-    const logoutButton = document.getElementById('logoutButton');
+    /**
+     * Constructor
+     */
+    constructor() {
+        this.#firebaseService = FirebaseService.getInstance();
+        this.#cryptoService = new CryptoService();
+    }
 
-    if (logoutButton) {
-        logoutButton.disabled = true;
-        logoutButton.addEventListener('click', async () => {
-            logoutButton.disabled = true;
-            statusDiv.textContent = 'Abmelden laeuft...';
-            statusDiv.style.backgroundColor = '#ff9800';
+    /**
+     * Upload multiple student images
+     * @param {FileList} files - Files to upload
+     * @param {string} schoolYear - School year (e.g., "2024/2025")
+     * @param {string} classId - Class ID (e.g., "5a")
+     * @param {string} encryptionPassword - Password to encrypt images
+     * @returns {Promise<Object>} Upload results (successCount, errorCount, errors)
+     */
+    async uploadImages(files, schoolYear, classId, encryptionPassword) {
+        let successCount = 0;
+        let errorCount = 0;
+        const errors = [];
+
+        // Process each file
+        for (let file of files) {
             try {
-                await signOut(auth);
+                // Parse filename to extract student name
+                const studentInfo = this.#parseFilename(file.name);
+
+                // Read file as binary data
+                const arrayBuffer = await this.#readFileAsArrayBuffer(file);
+
+                // Encrypt the binary data
+                const encryptedData = await this.#cryptoService.encryptBinary(arrayBuffer, encryptionPassword);
+
+                // Create Student instance
+                const student = new Student(
+                    studentInfo.vorname,
+                    studentInfo.nachname,
+                    classId,
+                    schoolYear,
+                    encryptedData
+                );
+
+                // Save to database
+                await this.#saveStudentToDatabase(student, schoolYear, classId);
+
+                successCount++;
+                console.log(`Successfully uploaded: ${file.name}`);
             } catch (error) {
-                console.error('Logout error:', error);
-                statusDiv.textContent = 'Abmelden fehlgeschlagen. Bitte erneut versuchen.';
-                statusDiv.style.backgroundColor = '#f44336';
-                logoutButton.disabled = false;
+                errorCount++;
+                errors.push({ filename: file.name, error: error.message });
+                console.error(`Failed to upload ${file.name}:`, error);
             }
+        }
+
+        return { successCount, errorCount, errors };
+    }
+
+    /**
+     * Parse filename to extract student information
+     * Expected format: Nachname_Vorname.jpg
+     * @param {string} filename - Filename to parse
+     * @returns {Object} Object with vorname and nachname
+     * @throws {Error} If filename format is invalid
+     * @private
+     */
+    #parseFilename(filename) {
+        // Remove file extension
+        const nameWithoutExtension = filename.replace(/\.[^/.]+$/, "");
+
+        // Split by underscore
+        const parts = nameWithoutExtension.split('_');
+
+        if (parts.length !== 2) {
+            throw new Error(`Ungültiger Dateiname: ${filename}. Erwartet: Nachname_Vorname.jpg`);
+        }
+
+        return {
+            nachname: parts[0].trim(),
+            vorname: parts[1].trim()
+        };
+    }
+
+    /**
+     * Read file as ArrayBuffer
+     * @param {File} file - File to read
+     * @returns {Promise<ArrayBuffer>} File contents as ArrayBuffer
+     * @private
+     */
+    #readFileAsArrayBuffer(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(new Error("File reading failed"));
+            reader.readAsArrayBuffer(file);
         });
     }
 
-    // Authentication state
+    /**
+     * Save student to database
+     * @param {Student} student - Student instance with encrypted image
+     * @param {string} schoolYear - School year
+     * @param {string} classId - Class ID
+     * @returns {Promise<void>}
+     * @private
+     */
+    async #saveStudentToDatabase(student, schoolYear, classId) {
+        const studentId = student.getStudentId();
+        const path = `pictures/${schoolYear}/${classId}/${studentId}`;
 
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            statusDiv.textContent = `Logged in as ${user.email}. Ready.`;
-            statusDiv.style.backgroundColor = '#4CAF50';
-            if (logoutButton) {
-                logoutButton.disabled = false;
-            }
-        } else {
-            statusDiv.textContent = 'Not logged in. Redirecting...';
-            statusDiv.style.backgroundColor = '#f44336';
-            if (logoutButton) {
-                logoutButton.disabled = true;
-            }
-            const target = window.location.pathname + window.location.search + window.location.hash;
-            sessionStorage.setItem('redirectTo', target);
-            window.location.href = 'login.html';
-        }
-    });
+        const studentRef = this.#firebaseService.getRef(path);
+        await this.#firebaseService.setData(studentRef, student.toJSON());
 
-    // Crypto-Funktionen (kopiert)
-    async function deriveKey(password, salt) {
-        const enc = new TextEncoder();
-        const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
-        return await crypto.subtle.deriveKey(
-            { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
-            keyMaterial, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
-        );
+        console.log(`Saved student to database: ${path}`);
+    }
+}
+
+/**
+ * ============================================================================
+ * UPLOAD UI CONTROLLER CLASS
+ * ============================================================================
+ * Manages all UI interactions for the upload page.
+ *
+ * Responsibilities:
+ * - Update status messages
+ * - Get form values
+ * - Show image previews
+ * - Show alerts
+ * - Clear form
+ */
+class UploadUIController {
+    /**
+     * DOM element references
+     */
+    #statusDiv;
+    #encryptionPasswordInput;
+    #schoolYearInput;
+    #classSelectorInput;
+    #imageUploadInput;
+    #previewContainer;
+    #uploadButton;
+    #backButton;
+    #logoutButton;
+
+    /**
+     * Constructor - initializes all DOM element references
+     */
+    constructor() {
+        this.#statusDiv = document.getElementById('status');
+        this.#encryptionPasswordInput = document.getElementById('encryptionPassword');
+        this.#schoolYearInput = document.getElementById('schoolYear');
+        this.#classSelectorInput = document.getElementById('classSelector');
+        this.#imageUploadInput = document.getElementById('imageUpload');
+        this.#previewContainer = document.getElementById('previewContainer');
+        this.#uploadButton = document.getElementById('uploadButton');
+        this.#backButton = document.getElementById('backButton');
+        this.#logoutButton = document.getElementById('logoutButton');
     }
 
-    async function encrypt(arrayBuffer, password) {
-        const salt = crypto.getRandomValues(new Uint8Array(16));
-        const key = await deriveKey(password, salt);
-        const iv = crypto.getRandomValues(new Uint8Array(12));
-        
-        try {
-            // Encrypt the binary data directly
-            const encrypted = await crypto.subtle.encrypt(
-                { name: "AES-GCM", iv }, 
-                key, 
-                new Uint8Array(arrayBuffer)
-            );
-            
-            // Convert to base64 using Blob API
-            const blob = new Blob([new Uint8Array(encrypted)]);
-            const base64String = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                    // Remove data URL prefix
-                    const base64 = reader.result.split(',')[1];
-                    resolve(base64);
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-            });
-            
-            return {
-                encrypted: base64String,
-                iv: btoa(String.fromCharCode(...iv)),
-                salt: btoa(String.fromCharCode(...salt)),
-            };
-        } catch (error) {
-            console.error("Encryption error:", error);
-            throw error;
-        }
+    /**
+     * Set status message with background color
+     * @param {string} message - Status message
+     * @param {string} color - Background color (hex)
+     */
+    setStatus(message, color) {
+        this.#statusDiv.textContent = message;
+        this.#statusDiv.style.backgroundColor = color;
     }
 
-    // Update your image preview to still work with base64 for display
-    imageUpload.addEventListener('change', (e) => {
-        previewContainer.innerHTML = '';
-        const files = e.target.files;
+    /**
+     * Get encryption password
+     * @returns {string} Encryption password
+     */
+    getEncryptionPassword() {
+        return this.#encryptionPasswordInput.value;
+    }
+
+    /**
+     * Get school year
+     * @returns {string} School year (trimmed)
+     */
+    getSchoolYear() {
+        return this.#schoolYearInput.value.trim();
+    }
+
+    /**
+     * Get class ID
+     * @returns {string} Class ID (trimmed)
+     */
+    getClassId() {
+        return this.#classSelectorInput.value.trim();
+    }
+
+    /**
+     * Get selected files
+     * @returns {FileList} Selected files
+     */
+    getFiles() {
+        return this.#imageUploadInput.files;
+    }
+
+    /**
+     * Show image previews
+     * @param {FileList} files - Files to preview
+     */
+    showImagePreviews(files) {
+        // Clear existing previews
+        this.#previewContainer.innerHTML = '';
+
+        // Create preview for each file
         for (let file of files) {
             const reader = new FileReader();
             reader.onload = (ev) => {
                 const img = document.createElement('img');
-                img.src = ev.target.result; // Still use base64 for preview
+                img.src = ev.target.result;
                 img.alt = file.name;
                 img.style.maxWidth = '100px';
                 img.style.maxHeight = '100px';
                 img.style.border = '1px solid #ccc';
                 img.style.borderRadius = '5px';
                 img.title = file.name;
-                previewContainer.appendChild(img);
+                this.#previewContainer.appendChild(img);
             };
-            reader.readAsDataURL(file); // Keep this for preview
+            reader.readAsDataURL(file);
         }
-    });
+    }
 
+    /**
+     * Clear all form inputs and previews
+     */
+    clearForm() {
+        this.#previewContainer.innerHTML = '';
+        this.#imageUploadInput.value = '';
+    }
 
-    // In picsuploadjs.js, update the uploadButton event listener:
+    /**
+     * Enable/disable logout button
+     * @param {boolean} enabled - True to enable, false to disable
+     */
+    setLogoutButtonEnabled(enabled) {
+        if (this.#logoutButton) {
+            this.#logoutButton.disabled = !enabled;
+        }
+    }
 
-    uploadButton.addEventListener('click', async () => {
-        const encPassword = encryptionPassword.value;
+    /**
+     * Show error alert
+     * @param {string} title - Alert title
+     * @param {string} message - Alert message
+     */
+    showError(title, message) {
+        Swal.fire(title, message, 'error');
+    }
+
+    /**
+     * Show success alert
+     * @param {string} title - Alert title
+     * @param {string} message - Alert message
+     */
+    showSuccess(title, message) {
+        Swal.fire(title, message, 'success');
+    }
+
+    /**
+     * Add event listener for image upload input change
+     * @param {Function} handler - Event handler
+     */
+    onImageUploadChange(handler) {
+        this.#imageUploadInput.addEventListener('change', handler);
+    }
+
+    /**
+     * Add event listener for upload button click
+     * @param {Function} handler - Event handler
+     */
+    onUploadClick(handler) {
+        this.#uploadButton.addEventListener('click', handler);
+    }
+
+    /**
+     * Add event listener for back button click
+     * @param {Function} handler - Event handler
+     */
+    onBackClick(handler) {
+        this.#backButton.addEventListener('click', handler);
+    }
+
+    /**
+     * Add event listener for logout button click
+     * @param {Function} handler - Event handler
+     */
+    onLogoutClick(handler) {
+        if (this.#logoutButton) {
+            this.#logoutButton.addEventListener('click', handler);
+        }
+    }
+}
+
+/**
+ * ============================================================================
+ * UPLOAD PAGE APPLICATION CLASS
+ * ============================================================================
+ * Main controller for the picture upload page.
+ * Coordinates between upload service and UI controller.
+ *
+ * Responsibilities:
+ * - Initialize the application
+ * - Handle authentication state
+ * - Handle image selection and preview
+ * - Handle image upload
+ * - Handle navigation
+ */
+class UploadPageApp {
+    /**
+     * Service and controller instances
+     */
+    #authService;
+    #imageUploadService;
+    #uiController;
+
+    /**
+     * Constructor - initializes all services and controllers
+     */
+    constructor() {
+        this.#authService = new AuthService();
+        this.#imageUploadService = new ImageUploadService();
+        this.#uiController = new UploadUIController();
+    }
+
+    /**
+     * Initialize the application
+     * Sets up event listeners and auth state monitoring
+     */
+    initialize() {
+        // Set up event listeners
+        this.#setupEventListeners();
+
+        // Monitor authentication state
+        this.#setupAuthStateMonitoring();
+    }
+
+    /**
+     * Set up all event listeners
+     * @private
+     */
+    #setupEventListeners() {
+        // Image upload input change (show previews)
+        this.#uiController.onImageUploadChange((e) => this.#handleImageSelection(e));
+
+        // Upload button click
+        this.#uiController.onUploadClick(() => this.#handleUpload());
+
+        // Back button click
+        this.#uiController.onBackClick(() => {
+            window.location.href = 'index.html';
+        });
+
+        // Logout button click
+        this.#uiController.onLogoutClick(() => this.#handleLogout());
+    }
+
+    /**
+     * Set up authentication state monitoring
+     * @private
+     */
+    #setupAuthStateMonitoring() {
+        this.#authService.onAuthStateChanged((user) => {
+            if (user) {
+                // User is logged in
+                this.#uiController.setStatus(`Logged in as ${user.email}. Ready.`, '#4CAF50');
+                this.#uiController.setLogoutButtonEnabled(true);
+            } else {
+                // User is not logged in - redirect to login page
+                this.#uiController.setStatus('Not logged in. Redirecting...', '#f44336');
+                this.#uiController.setLogoutButtonEnabled(false);
+
+                const target = window.location.pathname + window.location.search + window.location.hash;
+                sessionStorage.setItem('redirectTo', target);
+                window.location.href = 'login.html';
+            }
+        });
+    }
+
+    /**
+     * Handle image selection (show previews)
+     * @param {Event} e - Change event
+     * @private
+     */
+    #handleImageSelection(e) {
+        const files = e.target.files;
+        this.#uiController.showImagePreviews(files);
+    }
+
+    /**
+     * Handle upload button click
+     * @private
+     */
+    async #handleUpload() {
+        // Validate inputs
+        const encPassword = this.#uiController.getEncryptionPassword();
         if (!encPassword) {
-            Swal.fire('Fehler', 'Bitte ein Verschlüsselungspasswort eingeben.', 'error');
+            this.#uiController.showError('Fehler', 'Bitte ein Verschlüsselungspasswort eingeben.');
             return;
         }
-        const schoolYear = schoolYearInput.value.trim();
+
+        const schoolYear = this.#uiController.getSchoolYear();
         if (!schoolYear) {
-            Swal.fire('Fehler', 'Bitte ein Schuljahr eingeben.', 'error');
+            this.#uiController.showError('Fehler', 'Bitte ein Schuljahr eingeben.');
             return;
         }
-        const classId = classSelector.value.trim();
+
+        const classId = this.#uiController.getClassId();
         if (!classId) {
-            Swal.fire('Fehler', 'Bitte eine Klasse eingeben.', 'error');
+            this.#uiController.showError('Fehler', 'Bitte eine Klasse eingeben.');
             return;
         }
-        const files = imageUpload.files;
+
+        const files = this.#uiController.getFiles();
         if (files.length === 0) {
-            Swal.fire('Fehler', 'Bitte Bilder auswählen.', 'error');
+            this.#uiController.showError('Fehler', 'Bitte Bilder auswählen.');
             return;
         }
 
-        let successCount = 0;
-        let errorCount = 0;
+        try {
+            // Upload images
+            const result = await this.#imageUploadService.uploadImages(files, schoolYear, classId, encPassword);
 
-        for (let file of files) {
-            const fileName = file.name.replace(/\.[^/.]+$/, ""); // Entferne .jpg
-            const parts = fileName.split('_');
-            if (parts.length !== 2) {
-                Swal.fire('Fehler', `Ungültiger Dateiname: ${file.name}. Erwartet: Nachname_Vorname.jpg`, 'error');
-                errorCount++;
-                continue;
+            // Show result message
+            if (result.errorCount === 0) {
+                // All uploads successful
+                this.#uiController.showSuccess('Fertig', `${result.successCount} Bilder erfolgreich hochgeladen.`);
+            } else if (result.successCount === 0) {
+                // All uploads failed
+                this.#uiController.showError('Fehler', `Alle ${result.errorCount} Uploads sind fehlgeschlagen.`);
+            } else {
+                // Some uploads failed
+                this.#uiController.showSuccess('Fertig', `${result.successCount} Bilder erfolgreich hochgeladen, ${result.errorCount} Fehler.`);
             }
-            const nachname = parts[0].trim();
-            const vorname = parts[1].trim();
-            const studentId = `${vorname}_${nachname}`; // Vorname_Nachname
 
-            try {
-                // Read file as binary data (ArrayBuffer)
-                const arrayBuffer = await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => resolve(e.target.result);
-                    reader.onerror = (e) => reject(new Error("File reading failed"));
-                    reader.readAsArrayBuffer(file);
-                });
+            // Clear form
+            this.#uiController.clearForm();
 
-                // Encrypt the binary data
-                const encryptedData = await encrypt(arrayBuffer, encPassword);
-
-                // Save to database with additional fields
-                const studentRef = ref(database, `pictures/${schoolYear}/${classId}/${studentId}`);
-                await set(studentRef, {
-                    encryptedData,
-                    nachname,        // Last name
-                    vorname,         // First name
-                    schuljahr: schoolYear  // School year
-                });
-
-                successCount++;
-            } catch (error) {
-                errorCount++;
-                console.error(`Fehler bei ${file.name}:`, error);
+            // Log errors if any
+            if (result.errors.length > 0) {
+                console.error('Upload errors:', result.errors);
             }
+        } catch (error) {
+            console.error('Upload error:', error);
+            this.#uiController.showError('Fehler', 'Fehler beim Hochladen: ' + error.message);
         }
+    }
 
-        Swal.fire('Fertig', `${successCount} Bilder erfolgreich hochgeladen, ${errorCount} Fehler.`, 'success');
-        previewContainer.innerHTML = '';
-        imageUpload.value = '';
-    });
+    /**
+     * Handle logout button click
+     * @private
+     */
+    async #handleLogout() {
+        this.#uiController.setLogoutButtonEnabled(false);
+        this.#uiController.setStatus('Abmelden laeuft...', '#ff9800');
 
-     
-    // Zurück-Button
-    backButton.addEventListener('click', () => {
-        window.location.href = 'index.html';
-    });
+        try {
+            await this.#authService.signOut();
+        } catch (error) {
+            console.error('Logout error:', error);
+            this.#uiController.setStatus('Abmelden fehlgeschlagen. Bitte erneut versuchen.', '#f44336');
+            this.#uiController.setLogoutButtonEnabled(true);
+        }
+    }
+}
 
+/**
+ * ============================================================================
+ * APPLICATION ENTRY POINT
+ * ============================================================================
+ * Create and initialize the application when DOM is ready
+ */
+document.addEventListener('DOMContentLoaded', () => {
+    const app = new UploadPageApp();
+    app.initialize();
 });

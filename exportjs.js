@@ -1,281 +1,611 @@
-// Import necessary modules from Firebase SDK
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
-import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { getDatabase, ref, set, get, query, orderByChild, equalTo } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js';
+/**
+ * ============================================================================
+ * EXPORT PAGE CONTROLLER
+ * ============================================================================
+ * This module handles the CSV export page using OOP principles.
+ *
+ * Classes:
+ * - ExportService: Manages grade export to CSV
+ * - ExportClassLoaderService: Loads available classes for export
+ * - ExportUIController: Manages UI state and interactions
+ * - ExportPageApp: Main application controller that coordinates everything
+ * ============================================================================
+ */
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Firebase Configuration
-    const firebaseConfig = {
-        apiKey: "AIzaSyCsI95RxiBk9GXaDpA39oJcyaPtVczr_Q4",
-        authDomain: "mundlnotendb.firebaseapp.com",
-        databaseURL: "https://mundlnotendb-default-rtdb.europe-west1.firebasedatabase.app",
-        projectId: "mundlnotendb",
-        storageBucket: "mundlnotendb.firebasestorage.app",
-        messagingSenderId: "282603615680",
-        appId: "1:282603615680:web:cfda956d14c3bcc6218425"
-    };
+import { FirebaseService, AuthService, CryptoService, Grade } from './services.js';
 
-    // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const database = getDatabase(app);
+/**
+ * ============================================================================
+ * EXPORT SERVICE CLASS
+ * ============================================================================
+ * Handles exporting grades to CSV format.
+ *
+ * Responsibilities:
+ * - Load grades from database
+ * - Decrypt grade data
+ * - Format data as CSV
+ * - Trigger CSV download
+ */
+class ExportService {
+    /**
+     * Service instances
+     */
+    #firebaseService;
+    #cryptoService;
 
-    // DOM Elements
-    const statusDiv = document.getElementById('status');
-    const encryptionPassword = document.getElementById('encryptionPassword');
-    const schoolYearInput = document.getElementById('schoolYear');
-    const classSelector = document.getElementById('classSelector');
-    const exportButton = document.getElementById('exportButton');
-    const backButton = document.getElementById('backButton');
-    const logoutButton = document.getElementById('logoutButton');
+    /**
+     * Constructor
+     */
+    constructor() {
+        this.#firebaseService = FirebaseService.getInstance();
+        this.#cryptoService = new CryptoService();
+    }
 
-    if (logoutButton) {
-        logoutButton.disabled = true;
-        logoutButton.addEventListener('click', async () => {
-            logoutButton.disabled = true;
-            statusDiv.textContent = 'Abmelden laeuft...';
-            statusDiv.style.backgroundColor = '#ff9800';
+    /**
+     * Export grades to CSV for a specific school year and class
+     * @param {string} schoolYear - School year (e.g., "2024/2025")
+     * @param {string} classId - Class ID (e.g., "5a")
+     * @param {string} encryptionPassword - Password to decrypt grades
+     * @returns {Promise<void>}
+     */
+    async exportToCSV(schoolYear, classId, encryptionPassword) {
+        try {
+            // Get all grades from database
+            const gradesRef = this.#firebaseService.getRef('grades');
+            const snapshot = await this.#firebaseService.getData(gradesRef);
+
+            if (!snapshot.exists()) {
+                throw new Error('NO_DATA');
+            }
+
+            // Filter grades by school year and class
+            const allGrades = snapshot.val();
+            const filteredGrades = this.#filterGrades(allGrades, schoolYear, classId);
+
+            if (Object.keys(filteredGrades).length === 0) {
+                throw new Error('NO_MATCHING_DATA');
+            }
+
+            console.log(`Found ${Object.keys(filteredGrades).length} grades for ${schoolYear} and class ${classId}`);
+
+            // Decrypt and convert to CSV
+            const csvData = await this.#convertGradesToCSV(filteredGrades, encryptionPassword);
+
+            // Download CSV file
+            this.#downloadCSV(csvData, classId, schoolYear);
+
+            return; // Success
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    /**
+     * Filter grades by school year and class
+     * @param {Object} allGrades - All grades from database
+     * @param {string} schoolYear - School year to filter
+     * @param {string} classId - Class ID to filter
+     * @returns {Object} Filtered grades
+     * @private
+     */
+    #filterGrades(allGrades, schoolYear, classId) {
+        const filtered = {};
+
+        Object.entries(allGrades).forEach(([key, grade]) => {
+            // Check if the grade matches the criteria
+            if (grade && grade.schuljahr === schoolYear && grade.classId === classId) {
+                filtered[key] = grade;
+            }
+        });
+
+        return filtered;
+    }
+
+    /**
+     * Convert grades to CSV format
+     * @param {Object} grades - Filtered grades
+     * @param {string} encryptionPassword - Password to decrypt grades
+     * @returns {Promise<string>} CSV content
+     * @private
+     */
+    async #convertGradesToCSV(grades, encryptionPassword) {
+        const csvRows = [];
+
+        // Add CSV header
+        csvRows.push(['Vorname', 'Nachname', 'Datum', 'Thema', 'Note']);
+
+        // Process each grade
+        for (const [key, grade] of Object.entries(grades)) {
             try {
-                await signOut(auth);
-            } catch (error) {
-                console.error('Logout error:', error);
-                statusDiv.textContent = 'Abmelden fehlgeschlagen. Bitte erneut versuchen.';
-                statusDiv.style.backgroundColor = '#f44336';
-                logoutButton.disabled = false;
+                // Decrypt the grade data
+                const decryptedPayload = await this.#cryptoService.decryptText(
+                    grade.encryptedData.encrypted,
+                    grade.encryptedData.iv,
+                    grade.encryptedData.salt,
+                    encryptionPassword
+                );
+
+                const gradeData = JSON.parse(decryptedPayload);
+
+                // Format date from YYYY-MM-DD to DD.MM.YYYY
+                const formattedDate = this.#formatDate(grade.date);
+
+                // Add row to CSV
+                csvRows.push([
+                    grade.vorname || '',
+                    grade.nachname || '',
+                    formattedDate,
+                    gradeData.comment || '',
+                    gradeData.note || ''
+                ]);
+            } catch (decryptError) {
+                console.error(`Failed to decrypt grade for ${key}:`, decryptError);
+                // Skip this grade if decryption fails
+            }
+        }
+
+        // Convert rows to CSV string (semicolon-separated, with quotes)
+        const csvContent = csvRows.map(row =>
+            row.map(field => `"${field}"`).join(';')
+        ).join('\n');
+
+        return csvContent;
+    }
+
+    /**
+     * Format date from YYYY-MM-DD to DD.MM.YYYY
+     * @param {string} date - Date in YYYY-MM-DD format
+     * @returns {string} Formatted date
+     * @private
+     */
+    #formatDate(date) {
+        const parts = date.split('-');
+        return `${parts[2]}.${parts[1]}.${parts[0]}`;
+    }
+
+    /**
+     * Download CSV file
+     * @param {string} csvContent - CSV content
+     * @param {string} classId - Class ID for filename
+     * @param {string} schoolYear - School year for filename
+     * @private
+     */
+    #downloadCSV(csvContent, classId, schoolYear) {
+        // Create Blob with CSV content
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+
+        // Create temporary download link
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `Noten_${classId}_${schoolYear}.csv`);
+        link.style.visibility = 'hidden';
+
+        // Trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        console.log('CSV download triggered');
+    }
+}
+
+/**
+ * ============================================================================
+ * EXPORT CLASS LOADER SERVICE CLASS
+ * ============================================================================
+ * Loads available classes for a given school year from grades database.
+ *
+ * Responsibilities:
+ * - Query database for available classes in grades
+ * - Extract unique class IDs
+ */
+class ExportClassLoaderService {
+    /**
+     * Firebase service instance
+     */
+    #firebaseService;
+
+    /**
+     * Constructor
+     */
+    constructor() {
+        this.#firebaseService = FirebaseService.getInstance();
+    }
+
+    /**
+     * Load classes for a specific school year from grades database
+     * @param {string} schoolYear - School year (e.g., "2024/2025")
+     * @returns {Promise<string[]>} Array of class IDs
+     */
+    async loadClassesForSchoolYear(schoolYear) {
+        if (!schoolYear) {
+            return [];
+        }
+
+        console.log(`Loading classes for school year: ${schoolYear}`);
+
+        try {
+            // Get all grades (without filtering)
+            const gradesRef = this.#firebaseService.getRef('grades');
+            const snapshot = await this.#firebaseService.getData(gradesRef);
+
+            console.log("Query executed, snapshot exists:", snapshot.exists());
+
+            if (!snapshot.exists()) {
+                console.log("No grades found in the database");
+                return [];
+            }
+
+            const grades = snapshot.val();
+            const classes = new Set();
+
+            // Extract unique classes for the selected school year
+            Object.entries(grades).forEach(([key, grade]) => {
+                // Check if the grade has the required fields
+                if (grade && grade.schuljahr === schoolYear && grade.classId) {
+                    classes.add(grade.classId);
+                }
+            });
+
+            console.log("Found classes:", Array.from(classes));
+
+            // Convert to array and sort
+            const sortedClasses = Array.from(classes).sort();
+
+            return sortedClasses;
+        } catch (error) {
+            console.error("Error loading classes:", error);
+            return [];
+        }
+    }
+}
+
+/**
+ * ============================================================================
+ * EXPORT UI CONTROLLER CLASS
+ * ============================================================================
+ * Manages all UI interactions for the export page.
+ *
+ * Responsibilities:
+ * - Update status messages
+ * - Get form values
+ * - Populate class selector
+ * - Show alerts
+ * - Handle navigation
+ */
+class ExportUIController {
+    /**
+     * DOM element references
+     */
+    #statusDiv;
+    #encryptionPasswordInput;
+    #schoolYearInput;
+    #classSelector;
+    #exportButton;
+    #backButton;
+    #logoutButton;
+
+    /**
+     * Constructor - initializes all DOM element references
+     */
+    constructor() {
+        this.#statusDiv = document.getElementById('status');
+        this.#encryptionPasswordInput = document.getElementById('encryptionPassword');
+        this.#schoolYearInput = document.getElementById('schoolYear');
+        this.#classSelector = document.getElementById('classSelector');
+        this.#exportButton = document.getElementById('exportButton');
+        this.#backButton = document.getElementById('backButton');
+        this.#logoutButton = document.getElementById('logoutButton');
+    }
+
+    /**
+     * Set status message with background color
+     * @param {string} message - Status message
+     * @param {string} color - Background color (hex)
+     */
+    setStatus(message, color) {
+        this.#statusDiv.textContent = message;
+        this.#statusDiv.style.backgroundColor = color;
+    }
+
+    /**
+     * Get encryption password
+     * @returns {string} Encryption password
+     */
+    getEncryptionPassword() {
+        return this.#encryptionPasswordInput.value;
+    }
+
+    /**
+     * Get school year
+     * @returns {string} School year (trimmed)
+     */
+    getSchoolYear() {
+        return this.#schoolYearInput.value.trim();
+    }
+
+    /**
+     * Get selected class ID
+     * @returns {string} Class ID
+     */
+    getClassId() {
+        return this.#classSelector.value;
+    }
+
+    /**
+     * Populate class selector with classes
+     * @param {string[]} classes - Array of class IDs
+     */
+    populateClassSelector(classes) {
+        // Clear existing options (except the first placeholder)
+        this.#classSelector.innerHTML = '<option value="">Klasse auswählen</option>';
+
+        if (classes.length === 0) {
+            // Add a "no classes found" option
+            const option = document.createElement('option');
+            option.value = "";
+            option.textContent = "Keine Klassen gefunden";
+            option.disabled = true;
+            this.#classSelector.appendChild(option);
+            return;
+        }
+
+        // Add options to class selector
+        classes.forEach(cls => {
+            const option = document.createElement('option');
+            option.value = cls;
+            option.textContent = cls;
+            this.#classSelector.appendChild(option);
+        });
+    }
+
+    /**
+     * Enable/disable logout button
+     * @param {boolean} enabled - True to enable, false to disable
+     */
+    setLogoutButtonEnabled(enabled) {
+        if (this.#logoutButton) {
+            this.#logoutButton.disabled = !enabled;
+        }
+    }
+
+    /**
+     * Show error alert
+     * @param {string} title - Alert title
+     * @param {string} message - Alert message
+     */
+    showError(title, message) {
+        Swal.fire(title, message, 'error');
+    }
+
+    /**
+     * Show info alert
+     * @param {string} title - Alert title
+     * @param {string} message - Alert message
+     */
+    showInfo(title, message) {
+        Swal.fire(title, message, 'info');
+    }
+
+    /**
+     * Show success alert
+     * @param {string} title - Alert title
+     * @param {string} message - Alert message
+     */
+    showSuccess(title, message) {
+        Swal.fire(title, message, 'success');
+    }
+
+    /**
+     * Add event listener for school year input
+     * @param {Function} handler - Event handler
+     */
+    onSchoolYearInput(handler) {
+        this.#schoolYearInput.addEventListener('input', handler);
+    }
+
+    /**
+     * Add event listener for export button
+     * @param {Function} handler - Event handler
+     */
+    onExportClick(handler) {
+        this.#exportButton.addEventListener('click', handler);
+    }
+
+    /**
+     * Add event listener for back button
+     * @param {Function} handler - Event handler
+     */
+    onBackClick(handler) {
+        this.#backButton.addEventListener('click', handler);
+    }
+
+    /**
+     * Add event listener for logout button
+     * @param {Function} handler - Event handler
+     */
+    onLogoutClick(handler) {
+        if (this.#logoutButton) {
+            this.#logoutButton.addEventListener('click', handler);
+        }
+    }
+}
+
+/**
+ * ============================================================================
+ * EXPORT PAGE APPLICATION CLASS
+ * ============================================================================
+ * Main controller for the export page.
+ * Coordinates between all services and UI controller.
+ *
+ * Responsibilities:
+ * - Initialize the application
+ * - Handle authentication state
+ * - Load classes when school year changes
+ * - Handle export button click
+ * - Handle navigation
+ */
+class ExportPageApp {
+    /**
+     * Service and controller instances
+     */
+    #authService;
+    #exportService;
+    #classLoaderService;
+    #uiController;
+
+    /**
+     * Constructor - initializes all services and controllers
+     */
+    constructor() {
+        this.#authService = new AuthService();
+        this.#exportService = new ExportService();
+        this.#classLoaderService = new ExportClassLoaderService();
+        this.#uiController = new ExportUIController();
+    }
+
+    /**
+     * Initialize the application
+     * Sets up event listeners and auth state monitoring
+     */
+    initialize() {
+        // Set up event listeners
+        this.#setupEventListeners();
+
+        // Monitor authentication state
+        this.#setupAuthStateMonitoring();
+    }
+
+    /**
+     * Set up all event listeners
+     * @private
+     */
+    #setupEventListeners() {
+        // School year input
+        this.#uiController.onSchoolYearInput(() => this.#handleSchoolYearInput());
+
+        // Export button
+        this.#uiController.onExportClick(() => this.#handleExport());
+
+        // Back button
+        this.#uiController.onBackClick(() => {
+            window.location.href = 'index.html';
+        });
+
+        // Logout button
+        this.#uiController.onLogoutClick(() => this.#handleLogout());
+    }
+
+    /**
+     * Set up authentication state monitoring
+     * @private
+     */
+    #setupAuthStateMonitoring() {
+        this.#authService.onAuthStateChanged((user) => {
+            if (user) {
+                // User is logged in
+                this.#uiController.setStatus(`Logged in as ${user.email}. Ready.`, '#4CAF50');
+                this.#uiController.setLogoutButtonEnabled(true);
+            } else {
+                // User is not logged in - redirect to login page
+                this.#uiController.setStatus('Not logged in. Redirecting...', '#f44336');
+                this.#uiController.setLogoutButtonEnabled(false);
+
+                const target = window.location.pathname + window.location.search + window.location.hash;
+                sessionStorage.setItem('redirectTo', target);
+                window.location.href = 'login.html';
             }
         });
     }
 
-    // --- 1. AUTHENTICATION & INITIALIZATION ---
+    /**
+     * Handle school year input change
+     * @private
+     */
+    async #handleSchoolYearInput() {
+        const schoolYear = this.#uiController.getSchoolYear();
 
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            statusDiv.textContent = `Logged in as ${user.email}. Ready.`;
-            statusDiv.style.backgroundColor = '#4CAF50';
-            if (logoutButton) {
-                logoutButton.disabled = false;
-            }
-        } else {
-            statusDiv.textContent = 'Not logged in. Redirecting...';
-            statusDiv.style.backgroundColor = '#f44336';
-            if (logoutButton) {
-                logoutButton.disabled = true;
-            }
-            const target = window.location.pathname + window.location.search + window.location.hash;
-            sessionStorage.setItem('redirectTo', target);
-            window.location.href = 'login.html';
-        }
-    });
-
-    // --- 2. CRYPTOGRAPHY FUNCTIONS ---
-
-    async function deriveKey(password, salt) {
-        const enc = new TextEncoder();
-        const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
-        return await crypto.subtle.deriveKey(
-            { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
-            keyMaterial, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
-        );
-    }
-
-    async function decrypt(encryptedBase64, ivBase64, saltBase64, password) {
-        const salt = Uint8Array.from(atob(saltBase64), c => c.charCodeAt(0));
-        const key = await deriveKey(password, salt);
-        const iv = Uint8Array.from(atob(ivBase64), c => c.charCodeAt(0));
-        const ciphertext = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
-        const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
-        return new TextDecoder().decode(decrypted);
-    }
-
-    // --- 3. LOAD CLASSES FOR SCHOOL YEAR ---
-
-    schoolYearInput.addEventListener('input', async () => {
-        const schoolYear = schoolYearInput.value.trim();
-        
-        // Clear existing options
-        classSelector.innerHTML = '<option value="">Klasse auswählen</option>';
-        
         if (!schoolYear) {
             console.log("No school year entered");
+            this.#uiController.populateClassSelector([]);
             return;
         }
-        
-        console.log(`Loading classes for school year: ${schoolYear}`);
-        
-        try {
-            // Get all grades (without filtering)
-            const gradesRef = ref(database, 'grades');
-            const snapshot = await get(gradesRef);
-            
-            console.log("Query executed, snapshot exists:", snapshot.exists());
-            
-            if (snapshot.exists()) {
-                const grades = snapshot.val();
-                console.log("Grades data retrieved");
-                
-                const classes = new Set();
-                
-                // Extract unique classes for the selected school year
-                Object.entries(grades).forEach(([key, grade]) => {
-                    console.log(`Processing grade ${key}:`, grade);
-                    // Check if the grade has the required fields
-                    if (grade && grade.schuljahr === schoolYear && grade.classId) {
-                        classes.add(grade.classId);
-                    }
-                });
-                
-                console.log("Found classes:", Array.from(classes));
-                
-                // Convert to array and sort
-                const sortedClasses = Array.from(classes).sort();
-                
-                if (sortedClasses.length === 0) {
-                    // Add a "no classes found" option
-                    const option = document.createElement('option');
-                    option.value = "";
-                    option.textContent = "Keine Klassen gefunden";
-                    option.disabled = true;
-                    classSelector.appendChild(option);
-                } else {
-                    // Add options to class selector
-                    sortedClasses.forEach(cls => {
-                        const option = document.createElement('option');
-                        option.value = cls;
-                        option.textContent = cls;
-                        classSelector.appendChild(option);
-                    });
-                }
-            } else {
-                console.log("No grades found in the database");
-                // Add a "no classes found" option
-                const option = document.createElement('option');
-                option.value = "";
-                option.textContent = "Keine Klassen gefunden";
-                option.disabled = true;
-                classSelector.appendChild(option);
-            }
-        } catch (error) {
-            console.error("Error loading classes:", error);
-            
-            // Add an error option
-            const option = document.createElement('option');
-            option.value = "";
-            option.textContent = "Fehler beim Laden";
-            option.disabled = true;
-            classSelector.appendChild(option);
-        }
-    });
 
-    // --- 4. EXPORT FUNCTIONALITY ---
+        // Load classes for the school year
+        const classes = await this.#classLoaderService.loadClassesForSchoolYear(schoolYear);
+        this.#uiController.populateClassSelector(classes);
+    }
 
-    exportButton.addEventListener('click', async () => {
-        const encPassword = encryptionPassword.value;
+    /**
+     * Handle export button click
+     * @private
+     */
+    async #handleExport() {
+        // Validate inputs
+        const encPassword = this.#uiController.getEncryptionPassword();
         if (!encPassword) {
-            Swal.fire('Fehler', 'Bitte ein Verschlüsselungspasswort eingeben.', 'error');
+            this.#uiController.showError('Fehler', 'Bitte ein Verschlüsselungspasswort eingeben.');
             return;
         }
-        
-        const schoolYear = schoolYearInput.value.trim();
+
+        const schoolYear = this.#uiController.getSchoolYear();
         if (!schoolYear) {
-            Swal.fire('Fehler', 'Bitte ein Schuljahr eingeben.', 'error');
+            this.#uiController.showError('Fehler', 'Bitte ein Schuljahr eingeben.');
             return;
         }
-        
-        const classId = classSelector.value;
+
+        const classId = this.#uiController.getClassId();
         if (!classId) {
-            Swal.fire('Fehler', 'Bitte eine Klasse auswählen.', 'error');
+            this.#uiController.showError('Fehler', 'Bitte eine Klasse auswählen.');
             return;
         }
-        
+
         try {
-            // Get all grades (without filtering)
-            const gradesRef = ref(database, 'grades');
-            const snapshot = await get(gradesRef);
-            
-            if (!snapshot.exists()) {
-                Swal.fire('Info', 'Keine Noten in der Datenbank gefunden.', 'info');
-                return;
-            }
-            
-            const allGrades = snapshot.val();
-            const grades = {};
-            
-            // Filter grades by school year and class
-            Object.entries(allGrades).forEach(([key, grade]) => {
-                // Check if the grade has the required fields and matches the criteria
-                if (grade && grade.schuljahr === schoolYear && grade.classId === classId) {
-                    grades[key] = grade;
-                }
-            });
-            
-            console.log(`Found ${Object.keys(grades).length} grades for ${schoolYear} and class ${classId}`);
-            
-            if (Object.keys(grades).length === 0) {
-                Swal.fire('Info', `Keine Noten für Klasse ${classId} im Schuljahr ${schoolYear} gefunden.`, 'info');
-                return;
-            }
-            
-            const csvData = [];
-            
-            // Add CSV header
-            csvData.push(['Vorname', 'Nachname', 'Datum', 'Thema', 'Note']);
-            
-            // Process each grade
-            for (const [key, grade] of Object.entries(grades)) {
-                try {
-                    // Decrypt the grade data
-                    const decryptedPayload = await decrypt(
-                        grade.encryptedData.encrypted, 
-                        grade.encryptedData.iv, 
-                        grade.encryptedData.salt, 
-                        encPassword
-                    );
-                    
-                    const gradeData = JSON.parse(decryptedPayload);
-                    
-                    // Format date from YYYY-MM-DD to DD.MM.YYYY
-                    const dateParts = grade.date.split('-');
-                    const formattedDate = `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}`;
-                    
-                    // Add row to CSV data
-                    csvData.push([
-                        grade.vorname || '',
-                        grade.nachname || '',
-                        formattedDate,
-                        gradeData.comment || '',
-                        gradeData.note || ''
-                    ]);
-                } catch (decryptError) {
-                    console.error(`Fehler beim Entschlüsseln der Note für ${key}:`, decryptError);
-                }
-            }
-            
-            // Generate CSV content
-            const csvContent = csvData.map(row => 
-                row.map(field => `"${field}"`).join(';')
-            ).join('\n');
-            
-            // Create download link
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.setAttribute('href', url);
-            link.setAttribute('download', `Noten_${classId}_${schoolYear}.csv`);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            Swal.fire('Erfolg', 'CSV-Datei wurde erfolgreich heruntergeladen.', 'success');
+            // Export to CSV
+            await this.#exportService.exportToCSV(schoolYear, classId, encPassword);
+
+            // Show success message
+            this.#uiController.showSuccess('Erfolg', 'CSV-Datei wurde erfolgreich heruntergeladen.');
         } catch (error) {
             console.error("Export error:", error);
-            Swal.fire('Fehler', 'Fehler beim Exportieren der Daten: ' + error.message, 'error');
+
+            // Handle specific error cases
+            if (error.message === 'NO_DATA') {
+                this.#uiController.showInfo('Info', 'Keine Noten in der Datenbank gefunden.');
+            } else if (error.message === 'NO_MATCHING_DATA') {
+                this.#uiController.showInfo('Info', `Keine Noten für Klasse ${classId} im Schuljahr ${schoolYear} gefunden.`);
+            } else {
+                this.#uiController.showError('Fehler', 'Fehler beim Exportieren der Daten: ' + error.message);
+            }
         }
-    });
+    }
 
-    // --- 5. NAVIGATION ---
+    /**
+     * Handle logout button click
+     * @private
+     */
+    async #handleLogout() {
+        this.#uiController.setLogoutButtonEnabled(false);
+        this.#uiController.setStatus('Abmelden laeuft...', '#ff9800');
 
-    backButton.addEventListener('click', () => {
-        window.location.href = 'index.html';
-    });
+        try {
+            await this.#authService.signOut();
+        } catch (error) {
+            console.error('Logout error:', error);
+            this.#uiController.setStatus('Abmelden fehlgeschlagen. Bitte erneut versuchen.', '#f44336');
+            this.#uiController.setLogoutButtonEnabled(true);
+        }
+    }
+}
+
+/**
+ * ============================================================================
+ * APPLICATION ENTRY POINT
+ * ============================================================================
+ * Create and initialize the application when DOM is ready
+ */
+document.addEventListener('DOMContentLoaded', () => {
+    const app = new ExportPageApp();
+    app.initialize();
 });

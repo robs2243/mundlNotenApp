@@ -1,258 +1,95 @@
-// Import necessary modules from Firebase SDK
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
-import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { getDatabase, ref, set, get, query, orderByChild, equalTo } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js';
+/**
+ * ============================================================================
+ * RATING PAGE CONTROLLER
+ * ============================================================================
+ * This module handles the main rating/grading page using OOP principles.
+ *
+ * Classes:
+ * - StudentImageService: Manages loading and decrypting student images
+ * - GradeService: Manages CRUD operations for grades
+ * - ClassLoaderService: Loads available classes for a school year
+ * - RatingUIController: Manages UI state and interactions
+ * - RatingPageApp: Main application controller that coordinates everything
+ * ============================================================================
+ */
 
-document.addEventListener('DOMContentLoaded', () => {
+import { FirebaseService, AuthService, CryptoService, Student, Grade } from './services.js';
 
-    // Your Firebase Configuration
-    const firebaseConfig = {
-        apiKey: "AIzaSyCsI95RxiBk9GXaDpA39oJcyaPtVczr_Q4",
-        authDomain: "mundlnotendb.firebaseapp.com",
-        databaseURL: "https://mundlnotendb-default-rtdb.europe-west1.firebasedatabase.app",
-        projectId: "mundlnotendb",
-        storageBucket: "mundlnotendb.firebasestorage.app",
-        messagingSenderId: "282603615680",
-        appId: "1:282603615680:web:cfda956d14c3bcc6218425"
-    };
+/**
+ * ============================================================================
+ * STUDENT IMAGE SERVICE CLASS
+ * ============================================================================
+ * Manages loading student images from Firebase and decrypting them.
+ *
+ * Responsibilities:
+ * - Load encrypted student images from database
+ * - Decrypt images using encryption password
+ * - Populate student boxes with images and metadata
+ */
+class StudentImageService {
+    /**
+     * Service instances
+     */
+    #firebaseService;
+    #cryptoService;
 
-    // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const database = getDatabase(app);
-
-    // DOM Elements
-    const statusDiv = document.getElementById('status');
-    const dateSelector = document.getElementById('dateSelector');
-    const grid = document.querySelector('.parent');
-
-    //Button for uploading pictures
-    const picsUploadButton = document.getElementById('picsUpload');
-    const logoutButton = document.getElementById('logoutButton');
-
-    // App State
-    const letzteKommentare = new Set();
-    let localGradesCache = {}; // Cache for decrypted grades for the current session
-
-    // --- 1. AUTHENTICATION & INITIALIZATION ---
-
-    picsUploadButton.addEventListener('click', () => {
-        window.location.href = 'picsupload.html';
-    });
-
-    if (logoutButton) {
-        logoutButton.disabled = true;
-        logoutButton.addEventListener('click', async () => {
-            logoutButton.disabled = true;
-            statusDiv.textContent = 'Abmelden laeuft...';
-            statusDiv.style.backgroundColor = '#ff9800';
-            try {
-                await signOut(auth);
-            } catch (error) {
-                console.error('Logout error:', error);
-                statusDiv.textContent = 'Abmelden fehlgeschlagen. Bitte erneut versuchen.';
-                statusDiv.style.backgroundColor = '#f44336';
-                logoutButton.disabled = false;
-            }
-        });
-    }
-    // Set today's date in date picker
-    dateSelector.valueAsDate = new Date();
-
-        
-    // Initialize class selector if school year is already set
-    const schoolYear = document.getElementById('schoolYear').value.trim();
-    if (schoolYear) {
-        loadClassesForSchoolYear();
+    /**
+     * Constructor
+     */
+    constructor() {
+        this.#firebaseService = FirebaseService.getInstance();
+        this.#cryptoService = new CryptoService();
     }
 
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            statusDiv.textContent = `Logged in as ${user.email}. Ready.`;
-            statusDiv.style.backgroundColor = '#4CAF50';
-            if (logoutButton) {
-                logoutButton.disabled = false;
-            }
-
-            const encPassword = document.getElementById('encryptionPassword').value;
-            const selectedSchoolYear = document.getElementById('schoolYear').value.trim();
-            const classId = document.getElementById('classSelector').value;
-            if (encPassword && selectedSchoolYear && classId) {
-                loadStudentImages();
-            }
-        } else {
-            statusDiv.textContent = 'Not logged in. Redirecting...';
-            statusDiv.style.backgroundColor = '#f44336';
-            if (logoutButton) {
-                logoutButton.disabled = true;
-            }
-            const target = window.location.pathname + window.location.search + window.location.hash;
-            sessionStorage.setItem('redirectTo', target);
-            window.location.href = 'login.html';
-        }
-    });
-
-    // --- 2. CRYPTOGRAPHY FUNCTIONS ---
-
-    async function deriveKey(password, salt) {
-        const enc = new TextEncoder();
-        const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
-        return await crypto.subtle.deriveKey(
-            { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
-            keyMaterial, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
-        );
-    }
-
-    async function encrypt(text, password) {
-        const salt = crypto.getRandomValues(new Uint8Array(16));
-        const key = await deriveKey(password, salt);
-        const iv = crypto.getRandomValues(new Uint8Array(12));
-        const encrypted = await crypto.subtle.encrypt(
-            { name: "AES-GCM", iv }, key, new TextEncoder().encode(text)
-        );
-        return {
-            encrypted: btoa(String.fromCharCode(...new Uint8Array(encrypted))),
-            iv: btoa(String.fromCharCode(...iv)),
-            salt: btoa(String.fromCharCode(...salt)),
-        };
-    }
-
-    async function decrypt(encryptedBase64, ivBase64, saltBase64, password) {
-        const salt = Uint8Array.from(atob(saltBase64), c => c.charCodeAt(0));
-        const key = await deriveKey(password, salt);
-        const iv = Uint8Array.from(atob(ivBase64), c => c.charCodeAt(0));
-        const ciphertext = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
-        const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
-        return new TextDecoder().decode(decrypted);
-    }
-
-    // --- 3. STUDENT IMAGE LOADING ---
-
-    async function loadStudentImages() {
-        const encPassword = document.getElementById('encryptionPassword').value;
-        if (!encPassword) {
-            console.log("No encryption password provided");
+    /**
+     * Load and display student images for a specific class and school year
+     * @param {string} schoolYear - School year (e.g., "2024/2025")
+     * @param {string} classId - Class ID (e.g., "5a")
+     * @param {string} encryptionPassword - Password to decrypt images
+     * @returns {Promise<void>}
+     */
+    async loadStudentImages(schoolYear, classId, encryptionPassword) {
+        if (!schoolYear || !classId || !encryptionPassword) {
+            console.log("Missing required parameters for loading images");
             return;
         }
-        
-        const classId = document.getElementById('classSelector').value;
-        if (!classId) {
-            console.log("No class selected");
-            return;
-        }
-        
-        const schoolYear = document.getElementById('schoolYear').value.trim();
-        if (!schoolYear) {
-            console.log("No school year entered");
-            return;
-        }
-        
-        // Use the school year as entered (with spaces if that's how it's stored)
-        const schoolYearPath = schoolYear;
-        
-        console.log(`Loading images for school year: "${schoolYearPath}", class: ${classId}`);
-        
+
+        console.log(`Loading images for school year: "${schoolYear}", class: ${classId}`);
+
         try {
             // Get all students in the class for the school year
-            const classRef = ref(database, `pictures/${schoolYearPath}/${classId}`);
-            const snapshot = await get(classRef);
-            
-            if (snapshot.exists()) {
-                const students = snapshot.val();
-                const studentIds = Object.keys(students);
-                console.log(`Found ${studentIds.length} students in the database`);
-                
-                // Get all student boxes in order
-                const studentBoxes = document.querySelectorAll('.redBox');
-                const totalBoxes = studentBoxes.length;
-                console.log(`Found ${totalBoxes} student boxes to fill`);
-                
-                // Fill each box with the corresponding student image
-                for (let i = 0; i < totalBoxes; i++) {
-                    const box = studentBoxes[i];
-                    const img = box.querySelector('img');
-                    const label = box.querySelector('.student-label');
-                    
-                    // If we have a student for this box index
-                    if (i < studentIds.length) {
-                        const studentId = studentIds[i];
-                        const studentData = students[studentId];
-                        const { vorname, nachname, encryptedData, schuljahr } = studentData;
-                        
-                        console.log(`Processing student: ${vorname} ${nachname} (ID: ${studentId}) for box ${i}`);
-                        
-                        try {
-                            // Store student metadata in the box
-                            box.dataset.vorname = vorname;
-                            box.dataset.nachname = nachname;
-                            box.dataset.klasse = classId;
-                            box.dataset.schuljahr = schuljahr; // Add school year
-                            
-                            // Update the alt text to show the actual student name
-                            img.alt = `${vorname} ${nachname}`;
-                            
-                            // Set the label text
-                            label.textContent = `${vorname} ${nachname}`;
-                            
-                            // Decrypt the image
-                            const decryptedArrayBuffer = await decryptBinary(
-                                encryptedData.encrypted,
-                                encryptedData.iv,
-                                encryptedData.salt,
-                                encPassword
-                            );
-                            
-                            // Convert ArrayBuffer to base64 using Blob API
-                            const blob = new Blob([decryptedArrayBuffer]);
-                            const base64String = await new Promise((resolve, reject) => {
-                                const reader = new FileReader();
-                                reader.onload = () => {
-                                    const base64 = reader.result.split(',')[1];
-                                    resolve(base64);
-                                };
-                                reader.onerror = reject;
-                                reader.readAsDataURL(blob);
-                            });
-                            
-                            // Set the image source and make it visible
-                            img.src = `data:image/jpeg;base64,${base64String}`;
-                            img.style.display = 'block'; // Show the image
-                            console.log(`Successfully loaded image for ${vorname} ${nachname} in box ${i}`);
-                        } catch (decryptError) {
-                            console.error(`Failed to decrypt image for ${vorname} ${nachname}:`, decryptError);
-                            
-                            // IMPORTANT: Clear metadata and label if decryption fails
-                            delete box.dataset.vorname;
-                            delete box.dataset.nachname;
-                            delete box.dataset.klasse;
-                            delete box.dataset.schuljahr;
-                            label.textContent = '';
-                            
-                            // Keep the image hidden
-                            img.style.display = 'none';
-                            img.alt = '';
-                        }
-                    } else {
-                        // If we have more boxes than students, keep the image hidden
-                        console.log(`No student available for box ${i}, keeping box empty`);
-                        
-                        // Ensure the image is hidden
-                        img.style.display = 'none';
-                        img.alt = '';
-                        
-                        // Clear the label text
-                        label.textContent = '';
-                        
-                        // Clear any existing metadata for empty boxes
-                        delete box.dataset.vorname;
-                        delete box.dataset.nachname;
-                        delete box.dataset.klasse;
-                        delete box.dataset.schuljahr;
-                    }
+            const classRef = this.#firebaseService.getRef(`pictures/${schoolYear}/${classId}`);
+            const snapshot = await this.#firebaseService.getData(classRef);
+
+            if (!snapshot.exists()) {
+                console.log(`No students found for class ${classId} in school year ${schoolYear}`);
+                Swal.fire('Info', `Keine Schülerdaten für Klasse ${classId} im Schuljahr ${schoolYear} gefunden.`, 'info');
+                return;
+            }
+
+            const students = snapshot.val();
+            const studentIds = Object.keys(students);
+            console.log(`Found ${studentIds.length} students in the database`);
+
+            // Get all student boxes in order
+            const studentBoxes = document.querySelectorAll('.redBox');
+            console.log(`Found ${studentBoxes.length} student boxes to fill`);
+
+            // Fill each box with the corresponding student image
+            for (let i = 0; i < studentBoxes.length; i++) {
+                const box = studentBoxes[i];
+
+                if (i < studentIds.length) {
+                    // We have a student for this box
+                    const studentId = studentIds[i];
+                    const studentData = students[studentId];
+                    const student = Student.fromDatabase(studentData, classId);
+
+                    await this.#loadStudentIntoBox(box, student, encryptionPassword);
+                } else {
+                    // No student for this box - clear it
+                    this.#clearBox(box);
                 }
-            } else {
-                console.log(`No students found for class ${classId} in school year ${schoolYearPath}`);
-                Swal.fire('Info', `Keine Schülerdaten für Klasse ${classId} im Schuljahr ${schoolYearPath} gefunden.`, 'info');
             }
         } catch (error) {
             console.error("Error loading student images:", error);
@@ -260,93 +97,502 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Add this new function for binary data (images)
-    async function decryptBinary(encryptedBase64, ivBase64, saltBase64, password) {
-        const salt = Uint8Array.from(atob(saltBase64), c => c.charCodeAt(0));
-        const key = await deriveKey(password, salt);
-        const iv = Uint8Array.from(atob(ivBase64), c => c.charCodeAt(0));
-        const ciphertext = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
-        const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
-        return decrypted; // Returns ArrayBuffer
+    /**
+     * Load a single student's image into a box
+     * @param {HTMLElement} box - The student box element
+     * @param {Student} student - Student instance
+     * @param {string} encryptionPassword - Password to decrypt image
+     * @private
+     */
+    async #loadStudentIntoBox(box, student, encryptionPassword) {
+        const img = box.querySelector('img');
+        const label = box.querySelector('.student-label');
+
+        console.log(`Processing student: ${student.getFullName()} for box`);
+
+        try {
+            // Store student metadata in the box's dataset
+            box.dataset.vorname = student.vorname;
+            box.dataset.nachname = student.nachname;
+            box.dataset.klasse = student.klasse;
+            box.dataset.schuljahr = student.schuljahr;
+
+            // Update the image alt text and label
+            img.alt = student.getFullName();
+            label.textContent = student.getFullName();
+
+            // Decrypt the image
+            const encryptedData = student.encryptedImage;
+            const decryptedArrayBuffer = await this.#cryptoService.decryptBinary(
+                encryptedData.encrypted,
+                encryptedData.iv,
+                encryptedData.salt,
+                encryptionPassword
+            );
+
+            // Convert ArrayBuffer to base64 using Blob API
+            const blob = new Blob([decryptedArrayBuffer]);
+            const base64String = await this.#convertBlobToBase64(blob);
+
+            // Set the image source and make it visible
+            img.src = `data:image/jpeg;base64,${base64String}`;
+            img.style.display = 'block';
+
+            console.log(`Successfully loaded image for ${student.getFullName()}`);
+        } catch (decryptError) {
+            console.error(`Failed to decrypt image for ${student.getFullName()}:`, decryptError);
+
+            // Clear metadata and label if decryption fails
+            this.#clearBox(box);
+        }
     }
 
-    // --- 4. CORE APPLICATION LOGIC ---
-    grid.addEventListener('click', async (e) => {
-        const box = e.target.closest('.redBox');
-        if (!box) return;
-        
-        // Check for necessary inputs
-        const encPassword = document.getElementById('encryptionPassword').value;
-        if (!encPassword) {
-            Swal.fire('Fehler', 'Bitte zuerst ein Verschlüsselungspasswort eingeben.', 'error');
-            return;
-        }
-        
-        document.querySelectorAll('.bild-selektiert').forEach(el => el.classList.remove('bild-selektiert'));
-        box.classList.add('bild-selektiert');
-        
-        // Check if student data is loaded
-        const vorname = box.dataset.vorname;
-        const nachname = box.dataset.nachname;
-        
-        // If no student metadata is available, show "No data loaded!" message
-        if (!vorname || !nachname) {
-            Swal.fire({
-                title: 'No data loaded!',
-                text: 'Keine Schülerdaten für dieses Feld geladen.',
-                icon: 'info',
-                confirmButtonText: 'OK'
-            });
-            return;
-        }
-        
-        // Get student metadata from the box
-        const klasse = box.dataset.klasse;
-        const schuljahr = box.dataset.schuljahr;
-        const studentName = `${vorname} ${nachname}`;
-        const studentId = `${vorname}_${nachname}`;
-        const classId = klasse || document.getElementById('classSelector').value;
-        
-        const date = document.getElementById('dateSelector').value;
-        let existingGrade = null;
-        let snapshot;
-        
-        // --- Step 1: Try to read from the database ---
+    /**
+     * Convert a Blob to base64 string
+     * @param {Blob} blob - Blob to convert
+     * @returns {Promise<string>} Base64 string
+     * @private
+     */
+    #convertBlobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const base64 = reader.result.split(',')[1];
+                resolve(base64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    /**
+     * Clear a student box (hide image, clear metadata)
+     * @param {HTMLElement} box - The student box element
+     * @private
+     */
+    #clearBox(box) {
+        const img = box.querySelector('img');
+        const label = box.querySelector('.student-label');
+
+        img.style.display = 'none';
+        img.alt = '';
+        label.textContent = '';
+
+        delete box.dataset.vorname;
+        delete box.dataset.nachname;
+        delete box.dataset.klasse;
+        delete box.dataset.schuljahr;
+    }
+
+    /**
+     * Reset all student boxes to empty state
+     */
+    resetAllBoxes() {
+        const studentBoxes = document.querySelectorAll('.redBox');
+
+        studentBoxes.forEach((box) => {
+            this.#clearBox(box);
+            box.classList.remove('bild-selektiert');
+        });
+
+        console.log("All images, labels and metadata reset to empty boxes");
+    }
+}
+
+/**
+ * ============================================================================
+ * GRADE SERVICE CLASS
+ * ============================================================================
+ * Manages CRUD operations for grades in the database.
+ *
+ * Responsibilities:
+ * - Load existing grades from database
+ * - Save new/updated grades to database
+ * - Encrypt/decrypt grade data
+ */
+class GradeService {
+    /**
+     * Service instances
+     */
+    #firebaseService;
+    #cryptoService;
+
+    /**
+     * Cache for decrypted grades (studentId -> grade data)
+     */
+    #gradesCache;
+
+    /**
+     * Constructor
+     */
+    constructor() {
+        this.#firebaseService = FirebaseService.getInstance();
+        this.#cryptoService = new CryptoService();
+        this.#gradesCache = {};
+    }
+
+    /**
+     * Load a grade for a specific student and date
+     * @param {string} studentId - Student ID (format: Vorname_Nachname)
+     * @param {string} classId - Class ID
+     * @param {string} date - Date in YYYY-MM-DD format
+     * @param {string} encryptionPassword - Password to decrypt grade
+     * @returns {Promise<Object|null>} Grade data or null if not found
+     */
+    async loadGrade(studentId, classId, date, encryptionPassword) {
         try {
-            const gradesRef = ref(database, 'grades');
-            const q = query(gradesRef, orderByChild('studentId_date_class'), equalTo(`${studentId}_${date}_${classId}`));
-            snapshot = await get(q);
-        } catch (dbError) {
-            console.error("Firebase Database Read Error:", dbError);
-            Swal.fire('Datenbankfehler!', 'Die Daten konnten nicht gelesen werden. Prüfen Sie die Konsolenausgabe und stellen Sie sicher, dass der Index in den Firebase-Regeln gesetzt ist.', 'error');
-            return;
-        }
-        
-        // --- Step 2: If data exists, try to decrypt it ---
-        if (snapshot.exists()) {
-            try {
-                const gradeData = Object.values(snapshot.val())[0];
-                const decryptedPayload = await decrypt(gradeData.encryptedData.encrypted, gradeData.encryptedData.iv, gradeData.encryptedData.salt, encPassword);
-                existingGrade = JSON.parse(decryptedPayload);
-                localGradesCache[studentId] = existingGrade;
-            } catch (decryptionError) {
-                console.error("Decryption Error:", decryptionError);
-                Swal.fire('Entschlüsselungsfehler!', 'Falsches Passwort oder die Daten sind beschädigt.', 'error');
-                return;
+            // Query the database for the grade
+            const gradesRef = this.#firebaseService.getRef('grades');
+            const compositeKey = `${studentId}_${date}_${classId}`;
+            const q = this.#firebaseService.createQuery(gradesRef, 'studentId_date_class', compositeKey);
+            const snapshot = await this.#firebaseService.getData(q);
+
+            if (!snapshot.exists()) {
+                return null; // No grade found
             }
+
+            // Decrypt the grade data
+            const gradeData = Object.values(snapshot.val())[0];
+            const decryptedPayload = await this.#cryptoService.decryptText(
+                gradeData.encryptedData.encrypted,
+                gradeData.encryptedData.iv,
+                gradeData.encryptedData.salt,
+                encryptionPassword
+            );
+
+            const parsedGrade = JSON.parse(decryptedPayload);
+
+            // Cache the decrypted grade
+            this.#gradesCache[studentId] = parsedGrade;
+
+            return parsedGrade;
+        } catch (error) {
+            console.error("Error loading grade:", error);
+            throw error;
         }
-        
-        // --- Step 3: Show the SweetAlert Modal ---
-        Swal.fire({
+    }
+
+    /**
+     * Save a grade to the database
+     * @param {Grade} grade - Grade instance to save
+     * @param {string} encryptionPassword - Password to encrypt grade
+     * @returns {Promise<void>}
+     */
+    async saveGrade(grade, encryptionPassword) {
+        try {
+            // Encrypt the grade data (note and comment)
+            const payload = JSON.stringify(grade.toEncryptedPayload());
+            const encryptedData = await this.#cryptoService.encryptText(payload, encryptionPassword);
+
+            // Convert to database format
+            const dbData = grade.toDatabaseFormat(encryptedData);
+
+            // Save to database
+            const gradeRef = this.#firebaseService.getRef('grades/' + grade.getGradeId());
+            await this.#firebaseService.setData(gradeRef, dbData);
+
+            // Update cache
+            this.#gradesCache[grade.studentId] = {
+                note: grade.note,
+                comment: grade.comment
+            };
+
+            console.log(`Grade saved for ${grade.studentId}`);
+        } catch (error) {
+            console.error("Error saving grade:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get cached grade for a student
+     * @param {string} studentId - Student ID
+     * @returns {Object|null} Cached grade or null
+     */
+    getCachedGrade(studentId) {
+        return this.#gradesCache[studentId] || null;
+    }
+}
+
+/**
+ * ============================================================================
+ * CLASS LOADER SERVICE CLASS
+ * ============================================================================
+ * Loads available classes for a given school year.
+ *
+ * Responsibilities:
+ * - Query database for available classes
+ * - Populate class selector dropdown
+ */
+class ClassLoaderService {
+    /**
+     * Firebase service instance
+     */
+    #firebaseService;
+
+    /**
+     * Constructor
+     */
+    constructor() {
+        this.#firebaseService = FirebaseService.getInstance();
+    }
+
+    /**
+     * Load classes for a specific school year
+     * @param {string} schoolYear - School year (e.g., "2024/2025")
+     * @returns {Promise<string[]>} Array of class IDs
+     */
+    async loadClassesForSchoolYear(schoolYear) {
+        if (!schoolYear) {
+            return [];
+        }
+
+        console.log(`Loading classes for school year: "${schoolYear}"`);
+
+        try {
+            // Get all classes for the school year from pictures database
+            const classesRef = this.#firebaseService.getRef(`pictures/${schoolYear}`);
+            const snapshot = await this.#firebaseService.getData(classesRef);
+
+            if (!snapshot.exists()) {
+                console.log(`No classes found for school year: ${schoolYear}`);
+                return [];
+            }
+
+            const classes = snapshot.val();
+            const classNames = Object.keys(classes);
+            console.log(`Found ${classNames.length} classes: ${classNames.join(', ')}`);
+
+            return classNames;
+        } catch (error) {
+            console.error("Error loading classes:", error);
+            return [];
+        }
+    }
+}
+
+/**
+ * ============================================================================
+ * RATING UI CONTROLLER CLASS
+ * ============================================================================
+ * Manages all UI interactions for the rating page.
+ *
+ * Responsibilities:
+ * - Update status messages
+ * - Get form values
+ * - Populate class selector
+ * - Handle student box clicks
+ * - Show grade input modal
+ */
+class RatingUIController {
+    /**
+     * DOM element references
+     */
+    #statusDiv;
+    #dateSelector;
+    #schoolYearInput;
+    #classSelector;
+    #encryptionPasswordInput;
+    #grid;
+    #picsUploadButton;
+    #excelExportButton;
+    #logoutButton;
+
+    /**
+     * Set of recent comments for autocomplete
+     */
+    #recentComments;
+
+    /**
+     * Constructor - initializes all DOM element references
+     */
+    constructor() {
+        this.#statusDiv = document.getElementById('status');
+        this.#dateSelector = document.getElementById('dateSelector');
+        this.#schoolYearInput = document.getElementById('schoolYear');
+        this.#classSelector = document.getElementById('classSelector');
+        this.#encryptionPasswordInput = document.getElementById('encryptionPassword');
+        this.#grid = document.querySelector('.parent');
+        this.#picsUploadButton = document.getElementById('picsUpload');
+        this.#excelExportButton = document.getElementById('excelExport');
+        this.#logoutButton = document.getElementById('logoutButton');
+
+        this.#recentComments = new Set();
+
+        // Set today's date in date picker
+        this.#dateSelector.valueAsDate = new Date();
+    }
+
+    /**
+     * Set status message with background color
+     * @param {string} message - Status message
+     * @param {string} color - Background color (hex)
+     */
+    setStatus(message, color) {
+        this.#statusDiv.textContent = message;
+        this.#statusDiv.style.backgroundColor = color;
+    }
+
+    /**
+     * Get encryption password
+     * @returns {string} Encryption password
+     */
+    getEncryptionPassword() {
+        return this.#encryptionPasswordInput.value;
+    }
+
+    /**
+     * Get school year
+     * @returns {string} School year
+     */
+    getSchoolYear() {
+        return this.#schoolYearInput.value.trim();
+    }
+
+    /**
+     * Get selected class ID
+     * @returns {string} Class ID
+     */
+    getClassId() {
+        return this.#classSelector.value;
+    }
+
+    /**
+     * Get selected date
+     * @returns {string} Date in YYYY-MM-DD format
+     */
+    getDate() {
+        return this.#dateSelector.value;
+    }
+
+    /**
+     * Populate class selector with classes
+     * @param {string[]} classes - Array of class IDs
+     */
+    populateClassSelector(classes) {
+        // Clear existing options except the first one (placeholder)
+        while (this.#classSelector.options.length > 1) {
+            this.#classSelector.remove(1);
+        }
+
+        if (classes.length === 0) {
+            // Add a "no classes found" option
+            const option = document.createElement('option');
+            option.value = "";
+            option.textContent = "Keine Klassen gefunden";
+            option.disabled = true;
+            this.#classSelector.appendChild(option);
+            return null;
+        }
+
+        // Add each class as an option
+        classes.forEach(className => {
+            const option = document.createElement('option');
+            option.value = className;
+            option.textContent = className;
+            this.#classSelector.appendChild(option);
+        });
+
+        // If there's only one class, select it automatically
+        if (classes.length === 1) {
+            this.#classSelector.value = classes[0];
+            return classes[0];
+        }
+
+        return null;
+    }
+
+    /**
+     * Enable/disable logout button
+     * @param {boolean} enabled - True to enable, false to disable
+     */
+    setLogoutButtonEnabled(enabled) {
+        if (this.#logoutButton) {
+            this.#logoutButton.disabled = !enabled;
+        }
+    }
+
+    /**
+     * Add event listener for school year input
+     * @param {Function} handler - Event handler
+     */
+    onSchoolYearInput(handler) {
+        this.#schoolYearInput.addEventListener('input', handler);
+    }
+
+    /**
+     * Add event listener for class selector change
+     * @param {Function} handler - Event handler
+     */
+    onClassChange(handler) {
+        this.#classSelector.addEventListener('change', handler);
+    }
+
+    /**
+     * Add event listener for encryption password input
+     * @param {Function} handler - Event handler
+     */
+    onPasswordInput(handler) {
+        this.#encryptionPasswordInput.addEventListener('input', handler);
+    }
+
+    /**
+     * Add event listener for grid clicks (student box selection)
+     * @param {Function} handler - Event handler
+     */
+    onGridClick(handler) {
+        this.#grid.addEventListener('click', handler);
+    }
+
+    /**
+     * Add event listener for logout button
+     * @param {Function} handler - Event handler
+     */
+    onLogoutClick(handler) {
+        if (this.#logoutButton) {
+            this.#logoutButton.addEventListener('click', handler);
+        }
+    }
+
+    /**
+     * Add event listener for pics upload button
+     * @param {Function} handler - Event handler
+     */
+    onPicsUploadClick(handler) {
+        this.#picsUploadButton.addEventListener('click', handler);
+    }
+
+    /**
+     * Add event listener for excel export button
+     * @param {Function} handler - Event handler
+     */
+    onExcelExportClick(handler) {
+        if (this.#excelExportButton) {
+            this.#excelExportButton.addEventListener('click', handler);
+        }
+    }
+
+    /**
+     * Show grade input modal for a student
+     * @param {string} studentName - Student's full name
+     * @param {string} klasse - Class ID
+     * @param {string} schuljahr - School year
+     * @param {Object|null} existingGrade - Existing grade data (note, comment)
+     * @returns {Promise<Object|null>} User input (note, comment) or null if cancelled
+     */
+    async showGradeModal(studentName, klasse, schuljahr, existingGrade) {
+        const result = await Swal.fire({
             title: `Bewertung für ${studentName}`,
             html: `
                 <div class="swal2-form">
                     <div style="margin-bottom: 10px; font-size: 14px; color: #666;">
-                        <strong>Klasse:</strong> ${klasse || 'N/A'} | 
+                        <strong>Klasse:</strong> ${klasse || 'N/A'} |
                         <strong>Schuljahr:</strong> ${schuljahr || 'N/A'}
                     </div>
                     <div class="swal2-radio-group">
-                        ${[1, 2, 3, 4, 5, 6].map(n => `<label><input type="radio" name="note" value="${n}" id="note-${n}"><span>Note ${n}</span></label>`).join('')}
+                        ${[1, 2, 3, 4, 5, 6].map(n =>
+                            `<label><input type="radio" name="note" value="${n}" id="note-${n}"><span>Note ${n}</span></label>`
+                        ).join('')}
                     </div>
                     <div>
                         <strong>Kommentar:</strong>
@@ -360,6 +606,8 @@ document.addEventListener('DOMContentLoaded', () => {
             didOpen: () => {
                 const input = document.getElementById('kommentar-input');
                 const container = document.getElementById('comment-suggestions-container');
+
+                // Pre-fill existing grade if available
                 if (existingGrade) {
                     if (existingGrade.note) {
                         const radio = document.getElementById(`note-${existingGrade.note}`);
@@ -367,201 +615,353 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     input.value = existingGrade.comment || '';
                 }
-                // Suggestion chips logic
-                if (letzteKommentare.size) {
-                    letzteKommentare.forEach(c => {
+
+                // Show suggestion chips
+                if (this.#recentComments.size) {
+                    this.#recentComments.forEach(c => {
                         const span = document.createElement('span');
                         span.className = 'suggestion-item';
                         span.textContent = c;
                         container.appendChild(span);
                     });
                 }
+
+                // Handle suggestion chip clicks
                 container.addEventListener('click', ev => {
                     if (ev.target.classList.contains('suggestion-item')) {
                         input.value = ev.target.textContent;
                         input.focus();
                     }
                 });
+
                 input.focus();
             },
             preConfirm: () => ({
                 note: document.querySelector('input[name="note"]:checked')?.value || null,
                 comment: document.getElementById('kommentar-input').value.trim()
             })
-        }).then(async (res) => {
-            if (res.isConfirmed) {
-                const { note, comment } = res.value;
-                if (!note && !comment) return; // Don't save empty grades
-                
-                const payload = JSON.stringify({ note, comment });
-                try {
-                    const encryptedData = await encrypt(payload, encPassword);
-                    const gradeId = `${studentId}_${date}_${classId}`;
-                    
-                    // Get student data from the box dataset
-                    const nachname = box.dataset.nachname;
-                    const vorname = box.dataset.vorname;
-                    const schuljahr = box.dataset.schuljahr;
-                    
-                    const newGradeData = {
-                        studentId,
-                        classId,
-                        date,
-                        studentId_date_class: gradeId,
-                        encryptedData,
-                        nachname,        // Add last name
-                        vorname,         // Add first name
-                        schuljahr        // Add school year
-                    };
-                    
-                    await set(ref(database, 'grades/' + gradeId), newGradeData);
-                    if (comment) letzteKommentare.add(comment);
-                    localGradesCache[studentId] = { note, comment };
-                } catch (error) {
-                    Swal.fire('Fehler!', 'Daten konnten nicht gespeichert werden: ' + error.message, 'error');
-                }
-            }
         });
-    });
 
-    // --- 5. EVENT LISTENERS ---
+        if (result.isConfirmed) {
+            const { note, comment } = result.value;
 
-    // Load classes when school year changes
-    document.getElementById('schoolYear').addEventListener('input', () => {
-        // Reset all images to default first
-        resetAllImagesToDefault();
-        
-        // Then load classes for the new school year
-        loadClassesForSchoolYear();
-    });
+            // Add comment to recent comments if not empty
+            if (comment) {
+                this.#recentComments.add(comment);
+            }
 
-    // Load images when class is changed
-    document.getElementById('classSelector').addEventListener('change', () => {
-        // Reset all images to default first
-        resetAllImagesToDefault();
-        
-        const encPassword = document.getElementById('encryptionPassword').value;
-        const schoolYear = document.getElementById('schoolYear').value.trim();
-        const classId = document.getElementById('classSelector').value;
-        
-        if (encPassword && schoolYear && classId) {
-            loadStudentImages();
+            return { note, comment };
         }
-    });
 
-    // Load images when password is entered
-    document.getElementById('encryptionPassword').addEventListener('input', () => {
-        const schoolYear = document.getElementById('schoolYear').value.trim();
-        const classId = document.getElementById('classSelector').value;
-        
-        if (schoolYear && classId) {
-            // Reset all images and metadata before loading with new password
-            resetAllImagesToDefault();
-            loadStudentImages();
-        }
-    });
-
-    // Excel Export Button
-    const excelExportButton = document.getElementById('excelExport');
-        if (excelExportButton) {
-            excelExportButton.addEventListener('click', () => {
-                window.location.href = 'export.html';
-            });
+        return null; // User cancelled
     }
-    // --- 6. HELPER FUNCTIONS ---
 
-    async function loadClassesForSchoolYear() {
-        const schoolYear = document.getElementById('schoolYear').value.trim();
-        const classSelector = document.getElementById('classSelector');
-        
-        // Clear existing options except the first one
-        while (classSelector.options.length > 1) {
-            classSelector.remove(1);
+    /**
+     * Show error alert
+     * @param {string} title - Alert title
+     * @param {string} message - Alert message
+     */
+    showError(title, message) {
+        Swal.fire(title, message, 'error');
+    }
+
+    /**
+     * Show info alert
+     * @param {string} title - Alert title
+     * @param {string} message - Alert message
+     */
+    showInfo(title, message) {
+        Swal.fire(title, message, 'info');
+    }
+}
+
+/**
+ * ============================================================================
+ * RATING PAGE APPLICATION CLASS
+ * ============================================================================
+ * Main controller for the rating page.
+ * Coordinates between all services and UI controller.
+ *
+ * Responsibilities:
+ * - Initialize the application
+ * - Handle authentication state
+ * - Coordinate student image loading
+ * - Handle grade input and saving
+ * - Handle navigation
+ */
+class RatingPageApp {
+    /**
+     * Service and controller instances
+     */
+    #authService;
+    #studentImageService;
+    #gradeService;
+    #classLoaderService;
+    #uiController;
+
+    /**
+     * Constructor - initializes all services and controllers
+     */
+    constructor() {
+        this.#authService = new AuthService();
+        this.#studentImageService = new StudentImageService();
+        this.#gradeService = new GradeService();
+        this.#classLoaderService = new ClassLoaderService();
+        this.#uiController = new RatingUIController();
+    }
+
+    /**
+     * Initialize the application
+     * Sets up event listeners and auth state monitoring
+     */
+    initialize() {
+        // Load classes if school year is already set
+        const schoolYear = this.#uiController.getSchoolYear();
+        if (schoolYear) {
+            this.#handleSchoolYearChange();
         }
-        
-        // Reset images to default when school year changes
-        resetAllImagesToDefault();
-        
-        if (!schoolYear) {
-            return;
-        }
-        
-        console.log(`Loading classes for school year: "${schoolYear}"`);
-        
-        try {
-            // Get all classes for the school year
-            const classesRef = ref(database, `pictures/${schoolYear}`);
-            const snapshot = await get(classesRef);
-            
-            if (snapshot.exists()) {
-                const classes = snapshot.val();
-                const classNames = Object.keys(classes);
-                console.log(`Found ${classNames.length} classes: ${classNames.join(', ')}`);
-                
-                // Add each class as an option
-                classNames.forEach(className => {
-                    const option = document.createElement('option');
-                    option.value = className;
-                    option.textContent = className;
-                    classSelector.appendChild(option);
-                });
-                
-                // If there's only one class, select it automatically
-                if (classNames.length === 1) {
-                    classSelector.value = classNames[0];
-                    // Trigger the change event to load images if password is available
-                    if (document.getElementById('encryptionPassword').value) {
-                        loadStudentImages();
-                    }
+
+        // Set up event listeners
+        this.#setupEventListeners();
+
+        // Monitor authentication state
+        this.#setupAuthStateMonitoring();
+    }
+
+    /**
+     * Set up all event listeners
+     * @private
+     */
+    #setupEventListeners() {
+        // School year input
+        this.#uiController.onSchoolYearInput(() => this.#handleSchoolYearChange());
+
+        // Class selector change
+        this.#uiController.onClassChange(() => this.#handleClassChange());
+
+        // Encryption password input
+        this.#uiController.onPasswordInput(() => this.#handlePasswordInput());
+
+        // Grid click (student box selection)
+        this.#uiController.onGridClick((e) => this.#handleGridClick(e));
+
+        // Logout button
+        this.#uiController.onLogoutClick(() => this.#handleLogout());
+
+        // Pics upload button
+        this.#uiController.onPicsUploadClick(() => {
+            window.location.href = 'picsupload.html';
+        });
+
+        // Excel export button
+        this.#uiController.onExcelExportClick(() => {
+            window.location.href = 'export.html';
+        });
+    }
+
+    /**
+     * Set up authentication state monitoring
+     * @private
+     */
+    #setupAuthStateMonitoring() {
+        this.#authService.onAuthStateChanged((user) => {
+            if (user) {
+                // User is logged in
+                this.#uiController.setStatus(`Logged in as ${user.email}. Ready.`, '#4CAF50');
+                this.#uiController.setLogoutButtonEnabled(true);
+
+                // Try to load images if all required inputs are available
+                const encPassword = this.#uiController.getEncryptionPassword();
+                const schoolYear = this.#uiController.getSchoolYear();
+                const classId = this.#uiController.getClassId();
+
+                if (encPassword && schoolYear && classId) {
+                    this.#loadImages();
                 }
             } else {
-                console.log(`No classes found for school year: ${schoolYear}`);
-                
-                // Add a "no classes found" option
-                const option = document.createElement('option');
-                option.value = "";
-                option.textContent = "Keine Klassen gefunden";
-                option.disabled = true;
-                classSelector.appendChild(option);
+                // User is not logged in - redirect to login page
+                this.#uiController.setStatus('Not logged in. Redirecting...', '#f44336');
+                this.#uiController.setLogoutButtonEnabled(false);
+
+                const target = window.location.pathname + window.location.search + window.location.hash;
+                sessionStorage.setItem('redirectTo', target);
+                window.location.href = 'login.html';
             }
-        } catch (error) {
-            console.error("Error loading classes:", error);
-            
-            // Add an error option
-            const option = document.createElement('option');
-            option.value = "";
-            option.textContent = "Fehler beim Laden";
-            option.disabled = true;
-            classSelector.appendChild(option);
+        });
+    }
+
+    /**
+     * Handle school year input change
+     * @private
+     */
+    async #handleSchoolYearChange() {
+        // Reset all images first
+        this.#studentImageService.resetAllBoxes();
+
+        // Load classes for the new school year
+        const schoolYear = this.#uiController.getSchoolYear();
+        const classes = await this.#classLoaderService.loadClassesForSchoolYear(schoolYear);
+        const autoSelectedClass = this.#uiController.populateClassSelector(classes);
+
+        // If a class was auto-selected and password is available, load images
+        if (autoSelectedClass && this.#uiController.getEncryptionPassword()) {
+            this.#loadImages();
         }
     }
 
-    function resetAllImagesToDefault() {
-        const studentBoxes = document.querySelectorAll('.redBox');
-        
-        studentBoxes.forEach((box) => {
-            const img = box.querySelector('img');
-            const label = box.querySelector('.student-label');
-            
-            // Hide the image element completely
-            img.style.display = 'none';
-            
-            // Clear the alt text
-            img.alt = '';
-            
-            // Clear the label text
-            label.textContent = '';
-            
-            // Remove ALL student metadata
-            delete box.dataset.vorname;
-            delete box.dataset.nachname;
-            delete box.dataset.klasse;
-            delete box.dataset.schuljahr;
-            
-            // Remove selection class if present
-            box.classList.remove('bild-selektiert');
-        });
-        
-        console.log("All images, labels and metadata reset to empty boxes");
+    /**
+     * Handle class selector change
+     * @private
+     */
+    #handleClassChange() {
+        // Reset all images first
+        this.#studentImageService.resetAllBoxes();
+
+        // Load images if password is available
+        const encPassword = this.#uiController.getEncryptionPassword();
+        const schoolYear = this.#uiController.getSchoolYear();
+        const classId = this.#uiController.getClassId();
+
+        if (encPassword && schoolYear && classId) {
+            this.#loadImages();
+        }
     }
+
+    /**
+     * Handle encryption password input
+     * @private
+     */
+    #handlePasswordInput() {
+        const schoolYear = this.#uiController.getSchoolYear();
+        const classId = this.#uiController.getClassId();
+
+        if (schoolYear && classId) {
+            // Reset all images and metadata before loading with new password
+            this.#studentImageService.resetAllBoxes();
+            this.#loadImages();
+        }
+    }
+
+    /**
+     * Load student images
+     * @private
+     */
+    async #loadImages() {
+        const schoolYear = this.#uiController.getSchoolYear();
+        const classId = this.#uiController.getClassId();
+        const encPassword = this.#uiController.getEncryptionPassword();
+
+        await this.#studentImageService.loadStudentImages(schoolYear, classId, encPassword);
+    }
+
+    /**
+     * Handle grid click (student box selection)
+     * @param {Event} e - Click event
+     * @private
+     */
+    async #handleGridClick(e) {
+        const box = e.target.closest('.redBox');
+        if (!box) return;
+
+        // Check for encryption password
+        const encPassword = this.#uiController.getEncryptionPassword();
+        if (!encPassword) {
+            this.#uiController.showError('Fehler', 'Bitte zuerst ein Verschlüsselungspasswort eingeben.');
+            return;
+        }
+
+        // Remove selection from all boxes and select this one
+        document.querySelectorAll('.bild-selektiert').forEach(el => el.classList.remove('bild-selektiert'));
+        box.classList.add('bild-selektiert');
+
+        // Check if student data is loaded
+        const vorname = box.dataset.vorname;
+        const nachname = box.dataset.nachname;
+
+        if (!vorname || !nachname) {
+            this.#uiController.showInfo('No data loaded!', 'Keine Schülerdaten für dieses Feld geladen.');
+            return;
+        }
+
+        // Get student metadata
+        const klasse = box.dataset.klasse;
+        const schuljahr = box.dataset.schuljahr;
+        const studentName = `${vorname} ${nachname}`;
+        const studentId = `${vorname}_${nachname}`;
+        const classId = klasse || this.#uiController.getClassId();
+        const date = this.#uiController.getDate();
+
+        // Try to load existing grade
+        let existingGrade = null;
+        try {
+            existingGrade = await this.#gradeService.loadGrade(studentId, classId, date, encPassword);
+        } catch (dbError) {
+            console.error("Firebase Database Read Error:", dbError);
+            this.#uiController.showError('Datenbankfehler!', 'Die Daten konnten nicht gelesen werden.');
+            return;
+        } catch (decryptionError) {
+            console.error("Decryption Error:", decryptionError);
+            this.#uiController.showError('Entschlüsselungsfehler!', 'Falsches Passwort oder die Daten sind beschädigt.');
+            return;
+        }
+
+        // Show grade input modal
+        const result = await this.#uiController.showGradeModal(studentName, klasse, schuljahr, existingGrade);
+
+        if (result) {
+            const { note, comment } = result;
+
+            // Don't save empty grades
+            if (!note && !comment) {
+                return;
+            }
+
+            // Create Grade instance
+            const grade = new Grade(
+                studentId,
+                classId,
+                date,
+                note,
+                comment,
+                vorname,
+                nachname,
+                schuljahr
+            );
+
+            // Save the grade
+            try {
+                await this.#gradeService.saveGrade(grade, encPassword);
+            } catch (error) {
+                this.#uiController.showError('Fehler!', 'Daten konnten nicht gespeichert werden: ' + error.message);
+            }
+        }
+    }
+
+    /**
+     * Handle logout button click
+     * @private
+     */
+    async #handleLogout() {
+        this.#uiController.setLogoutButtonEnabled(false);
+        this.#uiController.setStatus('Abmelden laeuft...', '#ff9800');
+
+        try {
+            await this.#authService.signOut();
+        } catch (error) {
+            console.error('Logout error:', error);
+            this.#uiController.setStatus('Abmelden fehlgeschlagen. Bitte erneut versuchen.', '#f44336');
+            this.#uiController.setLogoutButtonEnabled(true);
+        }
+    }
+}
+
+/**
+ * ============================================================================
+ * APPLICATION ENTRY POINT
+ * ============================================================================
+ * Create and initialize the application when DOM is ready
+ */
+document.addEventListener('DOMContentLoaded', () => {
+    const app = new RatingPageApp();
+    app.initialize();
 });

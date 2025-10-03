@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test OOP Code</title>
+</head>
+<body>
+    <h1>Testing OOP Refactor</h1>
+    <div id="output"></div>
+
+    <script type="module">
+        import { FirebaseService, AuthService, CryptoService } from './services.js';
+
+        const output = document.getElementById('output');
+
+        try {
+            // Test 1: Can we import?
+            output.innerHTML += '<p>✅ Imports work</p>';
+
+            // Test 2: Can we create FirebaseService?
+            const fbService = FirebaseService.getInstance();
+            output.innerHTML += '<p>✅ FirebaseService singleton works</p>';
+
+            // Test 3: Can we create AuthService?
+            const authService = new AuthService();
+            output.innerHTML += '<p>✅ AuthService works</p>';
+
+            // Test 4: Can we create CryptoService?
+            const cryptoService = new CryptoService();
+            output.innerHTML += '<p>✅ CryptoService works</p>';
+
+            output.innerHTML += '<p><strong>All basic tests passed!</strong></p>';
+        } catch (error) {
+            output.innerHTML += `<p style="color: red;">❌ Error: ${error.message}</p>`;
+            console.error('Test error:', error);
+        }
+    </script>
+</body>
+</html>
