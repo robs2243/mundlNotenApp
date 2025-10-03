@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Memory Game - Schüler zuordnen</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+</head>
+<body>
+    <div class="header-controls">
+        <h1>Schüler Memory Game</h1>
+        <div id="status">Verbinde mit Firebase...</div>
+        <div class="controls-grid">
+            <div>
+                <label for="encryptionPassword"><b>Verschlüsselungspasswort</b></label>
+                <input type="password" id="encryptionPassword" placeholder="Geheimes Passwort eingeben">
+            </div>
+            <div>
+                <label for="schoolYear">Schuljahr</label>
+                <input type="text" id="schoolYear" placeholder="z.B. 2024-2025">
+            </div>
+            <div>
+                <label for="classSelector">Klasse</label>
+                <select id="classSelector">
+                    <option value="">Klasse auswählen</option>
+                </select>
+            </div>
+            <div class="button-group">
+                <button id="startGame" class="btn btn-success">Spiel starten</button>
+                <button id="resetGame" class="btn btn-warning">Neu starten</button>
+                <button id="backButton" class="btn btn-primary">Zurück zur Hauptseite</button>
+                <button id="logoutButton" type="button" class="btn btn-secondary">Abmelden</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="gameContainer">
+        <div id="picturesContainer" class="game-section">
+            <h2>Bilder</h2>
+            <div id="picturesGrid" class="pictures-grid"></div>
+        </div>
+        <div id="namesContainer" class="game-section">
+            <h2>Namen</h2>
+            <div id="namesGrid" class="names-grid"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js" type="module"></script>
+    <script src="app.js" type="module"></script>
+</body>
+</html>
