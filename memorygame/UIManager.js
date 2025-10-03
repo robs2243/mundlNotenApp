@@ -96,12 +96,42 @@ export class UIManager {
         });
     }
 
-    async showVictory(matchCount) {
+    async showVictory(matchCount, tries, timeInSeconds, isNewHighscore, previousBestTime) {
+        const minutes = Math.floor(timeInSeconds / 60);
+        const seconds = timeInSeconds % 60;
+        const timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+        let htmlMessage = `
+            <p>Du hast alle ${matchCount} Schüler richtig zugeordnet!</p>
+            <p>Du hast ${tries} Versuche gebraucht und ${timeText} Minuten benötigt.</p>
+        `;
+
+        // Add highscore message with special styling
+        if (isNewHighscore) {
+            if (previousBestTime === null) {
+                htmlMessage += `
+                    <div class="highscore-message">
+                        <p class="highscore-flash">🏆 Erste Bestzeit: ${timeInSeconds} Sek.! 🏆</p>
+                    </div>
+                `;
+            } else {
+                htmlMessage += `
+                    <div class="highscore-message">
+                        <p class="highscore-flash">🎉 Neue Bestzeit: ${timeInSeconds} Sek.! 🎉</p>
+                        <p class="old-time">Die alte war: ${previousBestTime} Sek.</p>
+                    </div>
+                `;
+            }
+        }
+
         await Swal.fire({
             title: 'Herzlichen Glückwunsch!',
-            text: `Du hast alle ${matchCount} Schüler richtig zugeordnet!`,
+            html: htmlMessage,
             icon: 'success',
-            confirmButtonText: 'OK'
+            confirmButtonText: 'OK',
+            customClass: {
+                popup: 'victory-popup'
+            }
         });
     }
 

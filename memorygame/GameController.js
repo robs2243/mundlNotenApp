@@ -13,6 +13,10 @@ export class GameController {
 
         this.students = [];
         this.isGameActive = false;
+        this.timerInterval = null;
+        this.currentUser = null;
+        this.currentClass = null;
+        this.currentSchoolYear = null;
     }
 
     initialize() {
@@ -24,6 +28,7 @@ export class GameController {
     checkAuthentication() {
         this.firebaseService.checkAuth((user) => {
             if (user) {
+                this.currentUser = user;
                 this.uiManager.showStatus(`Eingeloggt als ${user.email}`, 'success');
                 document.getElementById('logoutButton').disabled = false;
             } else {
@@ -115,6 +120,9 @@ export class GameController {
             return;
         }
 
+        this.currentSchoolYear = schoolYear;
+        this.currentClass = classId;
+
         this.uiManager.showStatus('Lade Schülerdaten...', 'info');
 
         try {
@@ -151,6 +159,9 @@ export class GameController {
             // Initialize game
             this.gameBoard.initialize(this.students);
             this.isGameActive = true;
+
+            // Start timer display update
+            this.startTimerDisplay();
 
             // Render UI
             this.uiManager.renderPictures(
@@ -207,14 +218,39 @@ export class GameController {
 
                 const progress = this.gameBoard.getProgress();
                 this.uiManager.showStatus(
-                    `Richtig! ${progress.matched} von ${progress.total} gefunden`,
+                    `Richtig! ${progress.matched} von ${progress.total} gefunden. Du hast ${progress.tries} Versuche gebraucht.`,
                     'success'
                 );
 
                 if (this.gameBoard.isComplete()) {
                     this.isGameActive = false;
-                    setTimeout(() => {
-                        this.uiManager.showVictory(progress.total);
+                    this.gameBoard.stopTimer();
+                    this.stopTimerDisplay();
+
+                    const elapsedTime = this.gameBoard.getElapsedTime();
+
+                    setTimeout(async () => {
+                        // Get previous best time BEFORE saving the new score
+                        const previousBestTime = await this.firebaseService.getBestTimeForUserAndClass(
+                            this.currentUser.uid,
+                            this.currentSchoolYear,
+                            this.currentClass
+                        );
+
+                        // Save the new score
+                        await this.saveHighscore(progress.total, progress.tries, elapsedTime);
+
+                        // Check if it's a new highscore
+                        const isNewHighscore = previousBestTime === null || elapsedTime < previousBestTime;
+
+                        // Show victory message with highscore info
+                        await this.uiManager.showVictory(
+                            progress.total,
+                            progress.tries,
+                            elapsedTime,
+                            isNewHighscore,
+                            previousBestTime
+                        );
                     }, 500);
                 }
             } else {
@@ -232,11 +268,50 @@ export class GameController {
         }
     }
 
+    startTimerDisplay() {
+        const timerElement = document.getElementById('timer');
+        this.timerInterval = setInterval(() => {
+            const elapsedTime = this.gameBoard.getElapsedTime();
+            const formattedTime = this.gameBoard.formatTime(elapsedTime);
+            timerElement.textContent = `Zeit: ${formattedTime}`;
+        }, 1000);
+    }
+
+    stopTimerDisplay() {
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+            this.timerInterval = null;
+        }
+    }
+
+    async saveHighscore(totalStudents, tries, timeInSeconds) {
+        try {
+            const highscoreData = {
+                userEmail: this.currentUser.email,
+                userId: this.currentUser.uid,
+                schoolYear: this.currentSchoolYear,
+                classId: this.currentClass,
+                totalStudents: totalStudents,
+                tries: tries,
+                timeInSeconds: timeInSeconds,
+                date: new Date().toISOString(),
+                timestamp: Date.now()
+            };
+
+            await this.firebaseService.saveHighscore(highscoreData);
+            console.log("Highscore saved:", highscoreData);
+        } catch (error) {
+            console.error("Error saving highscore:", error);
+        }
+    }
+
     resetGame() {
         this.isGameActive = false;
         this.students = [];
         this.gameBoard = new GameBoard();
         this.uiManager.clearGame();
+        this.stopTimerDisplay();
+        document.getElementById('timer').textContent = 'Zeit: 0:00';
         this.uiManager.showStatus('Spiel zurückgesetzt', 'info');
     }
 

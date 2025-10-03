@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
-import { getDatabase, ref, get } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js';
+import { getDatabase, ref, get, push, query, orderByChild, equalTo } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js';
 
 export class FirebaseService {
     constructor() {
@@ -64,6 +64,47 @@ export class FirebaseService {
             }
         } catch (error) {
             console.error("Error loading classes:", error);
+            throw error;
+        }
+    }
+
+    async saveHighscore(highscoreData) {
+        try {
+            const highscoresRef = ref(this.database, 'memorygame_highscores');
+            await push(highscoresRef, highscoreData);
+            console.log("Highscore saved successfully");
+        } catch (error) {
+            console.error("Error saving highscore:", error);
+            throw error;
+        }
+    }
+
+    async getBestTimeForUserAndClass(userId, schoolYear, classId) {
+        try {
+            const highscoresRef = ref(this.database, 'memorygame_highscores');
+            const snapshot = await get(highscoresRef);
+
+            if (!snapshot.exists()) {
+                return null;
+            }
+
+            const allHighscores = snapshot.val();
+            let bestTime = null;
+
+            // Filter and find best time for this user, school year, and class
+            Object.values(allHighscores).forEach(score => {
+                if (score.userId === userId &&
+                    score.schoolYear === schoolYear &&
+                    score.classId === classId) {
+                    if (bestTime === null || score.timeInSeconds < bestTime) {
+                        bestTime = score.timeInSeconds;
+                    }
+                }
+            });
+
+            return bestTime;
+        } catch (error) {
+            console.error("Error getting best time:", error);
             throw error;
         }
     }

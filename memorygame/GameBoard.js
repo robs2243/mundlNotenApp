@@ -7,6 +7,10 @@ export class GameBoard {
         this.selectedName = null;
         this.matchedStudents = new Set();
         this.isProcessing = false;
+        this.tries = 0;
+        this.startTime = null;
+        this.endTime = null;
+        this.timerInterval = null;
     }
 
     initialize(students) {
@@ -17,6 +21,9 @@ export class GameBoard {
         this.selectedPicture = null;
         this.selectedName = null;
         this.isProcessing = false;
+        this.tries = 0;
+        this.startTime = Date.now();
+        this.endTime = null;
         console.log(`GameBoard initialized with ${students.length} students`);
     }
 
@@ -63,6 +70,7 @@ export class GameBoard {
         }
 
         this.isProcessing = true;
+        this.tries++; // Increment try counter
 
         const isMatch = this.selectedPicture === this.selectedName;
 
@@ -73,7 +81,8 @@ export class GameBoard {
         const result = {
             isMatch,
             pictureId: this.selectedPicture,
-            nameId: this.selectedName
+            nameId: this.selectedName,
+            tries: this.tries
         };
 
         if (isMatch) {
@@ -98,7 +107,24 @@ export class GameBoard {
     getProgress() {
         return {
             matched: this.matchedStudents.size,
-            total: this.students.length
+            total: this.students.length,
+            tries: this.tries
         };
+    }
+
+    getElapsedTime() {
+        if (!this.startTime) return 0;
+        const endTime = this.endTime || Date.now();
+        return Math.floor((endTime - this.startTime) / 1000); // Return seconds
+    }
+
+    formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    stopTimer() {
+        this.endTime = Date.now();
     }
 }

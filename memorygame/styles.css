@@ -33,6 +33,17 @@ body {
     color: white;
 }
 
+.timer {
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 24px;
+    background-color: #2196F3;
+    color: white;
+}
+
 .controls-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -192,4 +203,49 @@ body {
     #gameContainer {
         grid-template-columns: 1fr;
     }
+}
+
+/* Highscore message styling */
+.highscore-message {
+    margin-top: 20px;
+    padding: 15px;
+    background: linear-gradient(135deg, #ff0000, #ff6b6b);
+    border-radius: 10px;
+    border: 3px solid #ff0000;
+}
+
+.highscore-flash {
+    font-size: 20px;
+    font-weight: bold;
+    color: white;
+    margin: 10px 0;
+    animation: flash 1s infinite;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.old-time {
+    font-size: 16px;
+    color: #ffe0e0;
+    margin: 10px 0;
+    font-weight: 600;
+}
+
+@keyframes flash {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.05);
+    }
+}
+
+/* Victory popup styling */
+.victory-popup {
+    font-size: 16px;
+}
+
+.victory-popup p {
+    margin: 10px 0;
 }
