@@ -13,7 +13,7 @@
         <div id="status">Verbinde mit Firebase...</div>
         <div class="controls-grid">
             <div>
-                <label for="encryptionPassword"><b>Verschlüsselungspasswort</b></label>
+                <label for="encryptionPassword"><b>Verschluesselungspasswort</b></label>
                 <input type="password" id="encryptionPassword" placeholder="Passwort eingeben">
             </div>
             <div>
@@ -23,22 +23,20 @@
             <div>
                 <label for="classSelector">Klasse</label>
                 <select id="classSelector">
-                    <option value="">Klasse auswählen</option>
+                    <option value="">Klasse auswaehlen</option>
                 </select>
             </div>
             <div class="button-group">
-    <button id="backButton" class="btn btn-primary">Zurück zur Hauptseite</button>
-    <button id="exportButton" class="btn btn-success">CSV-Export</button>
-</div>
+                <button id="backButton" class="btn btn-primary">Zurueck zur Hauptseite</button>
+                <button id="exportButton" class="btn btn-success">CSV-Export</button>
+                <button id="logoutButton" type="button" class="btn btn-secondary">Abmelden</button>
+            </div>
         </div>
     </div>
-<!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js" type="module"></script>
     <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js" type="module"></script>
     <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js" type="module"></script>
-    <!-- Export logic -->
     <script src="exportjs.js" type="module"></script>
 </body>
 </html>

@@ -1,4 +1,0 @@
-{
-  "email": "test@test.de",
-  "password": "123456"
-}

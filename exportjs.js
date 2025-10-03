@@ -1,6 +1,6 @@
 // Import necessary modules from Firebase SDK
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
+import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
 import { getDatabase, ref, set, get, query, orderByChild, equalTo } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -27,32 +27,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const classSelector = document.getElementById('classSelector');
     const exportButton = document.getElementById('exportButton');
     const backButton = document.getElementById('backButton');
+    const logoutButton = document.getElementById('logoutButton');
+
+    if (logoutButton) {
+        logoutButton.disabled = true;
+        logoutButton.addEventListener('click', async () => {
+            logoutButton.disabled = true;
+            statusDiv.textContent = 'Abmelden laeuft...';
+            statusDiv.style.backgroundColor = '#ff9800';
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error('Logout error:', error);
+                statusDiv.textContent = 'Abmelden fehlgeschlagen. Bitte erneut versuchen.';
+                statusDiv.style.backgroundColor = '#f44336';
+                logoutButton.disabled = false;
+            }
+        });
+    }
 
     // --- 1. AUTHENTICATION & INITIALIZATION ---
-
-    async function autoLogin() {
-        try {
-            const response = await fetch('settings.json');
-            if (!response.ok) throw new Error('settings.json not found');
-            const settings = await response.json();
-            await signInWithEmailAndPassword(auth, settings.email, settings.password);
-        } catch (error) {
-            statusDiv.textContent = `Auto-Login failed: ${error.message}`;
-            statusDiv.style.backgroundColor = '#f44336'; // Red
-        }
-    }
 
     onAuthStateChanged(auth, (user) => {
         if (user) {
             statusDiv.textContent = `Logged in as ${user.email}. Ready.`;
-            statusDiv.style.backgroundColor = '#4CAF50'; // Green
+            statusDiv.style.backgroundColor = '#4CAF50';
+            if (logoutButton) {
+                logoutButton.disabled = false;
+            }
         } else {
-            statusDiv.textContent = 'Not logged in.';
-            statusDiv.style.backgroundColor = '#f44336'; // Red
+            statusDiv.textContent = 'Not logged in. Redirecting...';
+            statusDiv.style.backgroundColor = '#f44336';
+            if (logoutButton) {
+                logoutButton.disabled = true;
+            }
+            const target = window.location.pathname + window.location.search + window.location.hash;
+            sessionStorage.setItem('redirectTo', target);
+            window.location.href = 'login.html';
         }
     });
-
-    autoLogin();
 
     // --- 2. CRYPTOGRAPHY FUNCTIONS ---
 

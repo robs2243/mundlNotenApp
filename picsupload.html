@@ -10,11 +10,11 @@
 </head>
 <body>
     <div class="header-controls">
-        <h1>Bilder hochladen (Batch möglich)</h1>
+        <h1>Bilder hochladen (Batch moeglich)</h1>
         <div id="status">Verbinde mit Firebase...</div>
         <div class="controls-grid">
             <div>
-                <label for="encryptionPassword">Verschlüsselungspasswort</label>
+                <label for="encryptionPassword">Verschluesselungspasswort</label>
                 <input type="password" id="encryptionPassword" placeholder="Passwort eingeben">
             </div>
             <div>
@@ -26,13 +26,14 @@
                 <input type="text" id="classSelector" placeholder="Klasse eingeben (z.B. E1ME2)">
             </div>
             <div>
-                <label for="imageUpload">Bilder auswählen (mehrere möglich, Format: Nachname_Vorname.jpg)</label>
+                <label for="imageUpload">Bilder auswaehlen (mehrere moeglich, Format: Nachname_Vorname.jpg)</label>
                 <input type="file" id="imageUpload" accept="image/*" multiple>
-                <div id="previewContainer"></div> <!-- Vorschau für mehrere -->
+                <div id="previewContainer"></div>
             </div>
             <div class="button-group">
-                <button id="backButton" class="btn btn-primary">Zurück zur Hauptseite</button>
+                <button id="backButton" class="btn btn-primary">Zurueck zur Hauptseite</button>
                 <button id="uploadButton" class="btn btn-success">Hochladen</button>
+                <button id="logoutButton" type="button" class="btn btn-secondary">Abmelden</button>
             </div>
         </div>
     </div>

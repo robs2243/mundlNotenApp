@@ -65,6 +65,9 @@ html, body {
     gap: 10px;
     grid-column: 1 / -1;
 }
+.button-group .btn {
+    flex-grow: 1;
+}
 
 /* Upload and Export Buttons */
 .controls-grid #picsUpload,
@@ -257,6 +260,8 @@ html, body {
 .btn-primary:hover { background-color: #0056b3; }
 .btn-success { background-color: #28a745; }
 .btn-success:hover { background-color: #218838; }
+.btn-secondary { background-color: #6b7280; }
+.btn-secondary:hover { background-color: #4b5563; }
 
 
 /* --- DATEI-UPLOAD STYLING --- */
@@ -284,3 +289,4 @@ html, body {
 }
 
 /* --- ENDE DATEI-UPLOAD STYLING --- */
+
