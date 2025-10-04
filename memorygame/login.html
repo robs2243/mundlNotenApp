@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Memory Game - Login</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body.login-body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .login-card {
+            background-color: #ffffff;
+            padding: 30px 25px;
+            border-radius: 12px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            width: min(420px, 90vw);
+            display: grid;
+            gap: 18px;
+        }
+
+        .login-card h1 {
+            margin: 0;
+            text-align: center;
+            color: #1f2937;
+        }
+
+        .login-card p {
+            margin: 0;
+            text-align: center;
+            color: #4b5563;
+        }
+
+        .login-card label {
+            font-weight: 600;
+            color: #374151;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .login-card input[type="email"],
+        .login-card input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            font-size: 1em;
+            box-sizing: border-box;
+        }
+
+        .login-card button {
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            font-size: 1em;
+            font-weight: 600;
+            color: #ffffff;
+            background-color: #667eea;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .login-card button:disabled {
+            background-color: #c7d2fe;
+            cursor: not-allowed;
+        }
+
+        .login-card button:hover:not(:disabled):not(.secondary-button) {
+            background-color: #5568d3;
+        }
+
+        .login-card button.secondary-button {
+            background-color: #ef4444;
+        }
+
+        .login-card button.secondary-button:hover:not(:disabled) {
+            background-color: #dc2626;
+        }
+
+        #status {
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+            color: white;
+        }
+
+        .status-info {
+            background-color: #60a5fa;
+        }
+
+        .status-error {
+            background-color: #ef4444;
+        }
+
+        .status-success {
+            background-color: #22c55e;
+        }
+    </style>
+    <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js" type="module"></script>
+    <script type="module" src="login.js"></script>
+</head>
+<body class="login-body">
+    <section class="login-card">
+        <h1>🎮 Memory Game</h1>
+        <p>Bitte melden Sie sich an, um zu spielen.</p>
+        <div id="status" class="status-info">Bereit zur Anmeldung.</div>
+        <form id="loginForm">
+            <div>
+                <label for="loginEmail">E-Mail-Adresse</label>
+                <input type="email" id="loginEmail" autocomplete="username" required>
+            </div>
+            <div>
+                <label for="loginPassword">Passwort</label>
+                <input type="password" id="loginPassword" autocomplete="current-password" required>
+            </div>
+            <button type="submit" id="loginSubmit">Anmelden</button>
+        </form>
+        <button type="button" id="logoutButton" class="secondary-button" hidden>Abmelden</button>
+    </section>
+</body>
+</html>

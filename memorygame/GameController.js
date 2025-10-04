@@ -42,7 +42,7 @@ export class GameController {
                 document.getElementById('logoutButton').disabled = true;
                 const target = window.location.pathname + window.location.search + window.location.hash;
                 sessionStorage.setItem('redirectTo', target);
-                window.location.href = '../login.html';
+                window.location.href = 'login.html';
             }
         });
     }
@@ -61,11 +61,6 @@ export class GameController {
         // Reset game button
         document.getElementById('resetGame').addEventListener('click', () => {
             this.resetGame();
-        });
-
-        // Back button
-        document.getElementById('backButton').addEventListener('click', () => {
-            window.location.href = '../index.html';
         });
 
         // Logout button
