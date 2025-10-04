@@ -17,6 +17,12 @@ export class GameController {
         this.currentUser = null;
         this.currentClass = null;
         this.currentSchoolYear = null;
+        this.isMobileMode = false;
+        this.firstNameOnly = false;
+    }
+
+    isMobileDevice() {
+        return window.innerWidth <= 768;
     }
 
     initialize() {
@@ -164,18 +170,29 @@ export class GameController {
             this.startTimerDisplay();
 
             // Get checkbox state
-            const firstNameOnly = document.getElementById('firstNameOnly').checked;
+            this.firstNameOnly = document.getElementById('firstNameOnly').checked;
+
+            // Detect mobile mode
+            this.isMobileMode = this.isMobileDevice();
 
             // Render UI
             this.uiManager.renderPictures(
                 this.gameBoard.shuffledPictures,
                 (id) => this.handlePictureClick(id)
             );
-            this.uiManager.renderNames(
-                this.gameBoard.shuffledNames,
-                (id) => this.handleNameClick(id),
-                firstNameOnly
-            );
+
+            if (this.isMobileMode) {
+                // Hide names section on mobile
+                this.uiManager.hideNamesSection();
+            } else {
+                // Show names section on desktop
+                this.uiManager.showNamesSection();
+                this.uiManager.renderNames(
+                    this.gameBoard.shuffledNames,
+                    (id) => this.handleNameClick(id),
+                    this.firstNameOnly
+                );
+            }
 
             this.uiManager.showStatus(`Spiel gestartet! ${this.students.length} Schüler geladen`, 'success');
 
@@ -185,18 +202,80 @@ export class GameController {
         }
     }
 
-    handlePictureClick(studentId) {
+    async handlePictureClick(studentId) {
+        console.log('=== PICTURE CLICKED ===');
+        console.log('Student ID:', studentId);
+        console.log('Is Game Active:', this.isGameActive);
+        console.log('Is Mobile Mode:', this.isMobileMode);
+        console.log('Is Processing:', this.gameBoard.isProcessing);
+        console.log('Already Matched:', this.gameBoard.matchedStudents.has(studentId));
+        console.log('Matched Students:', Array.from(this.gameBoard.matchedStudents));
+
         if (!this.isGameActive) return;
 
-        const clicked = this.gameBoard.handlePictureClick(studentId);
-        if (!clicked) return;
+        if (this.isMobileMode) {
+            // Check if student is already matched
+            if (this.gameBoard.matchedStudents.has(studentId)) {
+                console.log('→ BLOCKED: Student already matched');
+                return;
+            }
 
-        this.uiManager.highlightSelection(
-            this.gameBoard.selectedPicture,
-            this.gameBoard.selectedName
-        );
+            // Prevent multiple popups
+            if (this.gameBoard.isProcessing) {
+                console.log('→ BLOCKED: Already processing');
+                return;
+            }
 
-        this.checkForMatch();
+            console.log('→ SHOWING POPUP');
+            this.gameBoard.isProcessing = true;
+
+            // Mobile mode: show popup with name choices (only unmatched students)
+            const unmatchedStudents = this.gameBoard.shuffledNames.filter(
+                student => !this.gameBoard.matchedStudents.has(student.id)
+            );
+
+            console.log('Unmatched students count:', unmatchedStudents.length);
+            console.log('Unmatched student IDs:', unmatchedStudents.map(s => s.id));
+
+            const selectedNameId = await this.uiManager.showMobileNameSelector(
+                unmatchedStudents,
+                this.firstNameOnly
+            );
+
+            console.log('User selected name ID:', selectedNameId);
+
+            if (!selectedNameId) {
+                // User cancelled
+                console.log('→ USER CANCELLED');
+                this.gameBoard.isProcessing = false;
+                return;
+            }
+
+            // Set both selections
+            this.gameBoard.selectedPicture = studentId;
+            this.gameBoard.selectedName = selectedNameId;
+
+            // Debug logging
+            console.log('Mobile Match Check:');
+            console.log('  Picture ID:', studentId);
+            console.log('  Selected Name ID:', selectedNameId);
+            console.log('  Match:', studentId === selectedNameId);
+
+            // Check match immediately
+            this.checkForMatchMobile();
+
+        } else {
+            // Desktop mode: normal selection
+            const clicked = this.gameBoard.handlePictureClick(studentId);
+            if (!clicked) return;
+
+            this.uiManager.highlightSelection(
+                this.gameBoard.selectedPicture,
+                this.gameBoard.selectedName
+            );
+
+            this.checkForMatch();
+        }
     }
 
     handleNameClick(studentId) {
@@ -211,6 +290,74 @@ export class GameController {
         );
 
         this.checkForMatch();
+    }
+
+    checkForMatchMobile() {
+        console.log('→ CHECKING MATCH (Mobile)');
+        const matchResult = this.gameBoard.checkMatch();
+        console.log('Match result:', matchResult);
+
+        if (matchResult) {
+            if (matchResult.isMatch) {
+                console.log('✓ CORRECT MATCH!');
+                // Mark as matched (fade out)
+                this.uiManager.markAsMatched(matchResult.pictureId);
+
+                const progress = this.gameBoard.getProgress();
+                this.uiManager.showStatus(
+                    `Richtig! ${progress.matched} von ${progress.total} gefunden. Du hast ${progress.tries} Versuche gebraucht.`,
+                    'success'
+                );
+
+                // Release processing lock
+                console.log('→ Releasing processing lock (correct match)');
+                this.gameBoard.isProcessing = false;
+
+                if (this.gameBoard.isComplete()) {
+                    this.isGameActive = false;
+                    this.gameBoard.stopTimer();
+                    this.stopTimerDisplay();
+
+                    const elapsedTime = this.gameBoard.getElapsedTime();
+
+                    setTimeout(async () => {
+                        const previousBestTime = await this.firebaseService.getBestTimeForUserAndClass(
+                            this.currentUser.uid,
+                            this.currentSchoolYear,
+                            this.currentClass
+                        );
+
+                        await this.saveHighscore(progress.total, progress.tries, elapsedTime);
+
+                        const isNewHighscore = previousBestTime === null || elapsedTime < previousBestTime;
+
+                        await this.uiManager.showVictory(
+                            progress.total,
+                            progress.tries,
+                            elapsedTime,
+                            isNewHighscore,
+                            previousBestTime
+                        );
+                    }, 500);
+                }
+            } else {
+                // Wrong match
+                console.log('✗ WRONG MATCH!');
+                this.uiManager.showStatus('Nicht richtig! Versuche es nochmal', 'error');
+
+                // Release processing lock after delay
+                setTimeout(() => {
+                    console.log('→ Releasing processing lock (wrong match)');
+                    this.gameBoard.reset();
+                    this.gameBoard.isProcessing = false;
+                    const progress = this.gameBoard.getProgress();
+                    this.uiManager.showStatus(
+                        `${progress.matched} von ${progress.total} gefunden`,
+                        'info'
+                    );
+                }, 1000);
+            }
+        }
     }
 
     checkForMatch() {

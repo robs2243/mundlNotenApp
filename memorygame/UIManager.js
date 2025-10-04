@@ -148,4 +148,50 @@ export class UIManager {
         this.picturesGrid.innerHTML = '';
         this.namesGrid.innerHTML = '';
     }
+
+    hideNamesSection() {
+        document.getElementById('namesContainer').style.display = 'none';
+    }
+
+    showNamesSection() {
+        document.getElementById('namesContainer').style.display = 'block';
+    }
+
+    async showMobileNameSelector(students, firstNameOnly) {
+        return new Promise((resolve) => {
+            let selectedId = null;
+
+            Swal.fire({
+                title: 'Wähle den richtigen Namen',
+                text: 'Welcher Schüler ist auf dem Bild?',
+                showCancelButton: true,
+                cancelButtonText: 'Abbrechen',
+                showConfirmButton: false,
+                html: `
+                    <div class="mobile-name-buttons">
+                        ${students.map(student => `
+                            <button class="mobile-name-btn" data-student-id="${student.id}">
+                                ${student.getDisplayName(firstNameOnly)}
+                            </button>
+                        `).join('')}
+                    </div>
+                `,
+                didOpen: () => {
+                    const container = Swal.getHtmlContainer();
+                    const buttons = container.querySelectorAll('.mobile-name-btn');
+                    buttons.forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            selectedId = btn.dataset.studentId;
+                            console.log('Button clicked, student ID:', selectedId);
+                            Swal.close();
+                        });
+                    });
+                },
+                didClose: () => {
+                    console.log('Popup closed, returning:', selectedId);
+                    resolve(selectedId);
+                }
+            });
+        });
+    }
 }

@@ -222,9 +222,53 @@ body {
     pointer-events: none;
 }
 
+/* Mobile name selector buttons */
+.mobile-name-buttons {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.mobile-name-btn {
+    padding: 15px 20px;
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.mobile-name-btn:hover {
+    background-color: #1976D2;
+    transform: scale(1.02);
+}
+
+.mobile-name-btn:active {
+    transform: scale(0.98);
+}
+
 @media (max-width: 768px) {
     #gameContainer {
         grid-template-columns: 1fr;
+    }
+
+    .pictures-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 10px;
+    }
+
+    .picture-item img {
+        height: 120px;
+    }
+
+    #namesContainer {
+        display: none;
     }
 }
 

@@ -69,7 +69,6 @@ export class GameBoard {
             return null;
         }
 
-        this.isProcessing = true;
         this.tries++; // Increment try counter
 
         const isMatch = this.selectedPicture === this.selectedName;
@@ -89,8 +88,6 @@ export class GameBoard {
             this.selectedPicture = null;
             this.selectedName = null;
         }
-
-        this.isProcessing = false;
 
         return result;
     }
