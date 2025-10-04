@@ -12,6 +12,10 @@ export class Student {
         return `${this.vorname} ${this.nachname}`;
     }
 
+    getDisplayName(firstNameOnly = false) {
+        return firstNameOnly ? this.vorname : this.getFullName();
+    }
+
     async decrypt(cryptoService, password) {
         try {
             const decryptedArrayBuffer = await cryptoService.decryptBinary(

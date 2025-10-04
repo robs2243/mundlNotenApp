@@ -163,6 +163,9 @@ export class GameController {
             // Start timer display update
             this.startTimerDisplay();
 
+            // Get checkbox state
+            const firstNameOnly = document.getElementById('firstNameOnly').checked;
+
             // Render UI
             this.uiManager.renderPictures(
                 this.gameBoard.shuffledPictures,
@@ -170,7 +173,8 @@ export class GameController {
             );
             this.uiManager.renderNames(
                 this.gameBoard.shuffledNames,
-                (id) => this.handleNameClick(id)
+                (id) => this.handleNameClick(id),
+                firstNameOnly
             );
 
             this.uiManager.showStatus(`Spiel gestartet! ${this.students.length} Schüler geladen`, 'success');

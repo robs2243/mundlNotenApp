@@ -37,14 +37,14 @@ export class UIManager {
         });
     }
 
-    renderNames(students, onClickCallback) {
+    renderNames(students, onClickCallback, firstNameOnly = false) {
         this.namesGrid.innerHTML = '';
 
         students.forEach(student => {
             const nameDiv = document.createElement('div');
             nameDiv.className = 'name-item';
             nameDiv.dataset.studentId = student.id;
-            nameDiv.textContent = student.getFullName();
+            nameDiv.textContent = student.getDisplayName(firstNameOnly);
 
             nameDiv.addEventListener('click', () => onClickCallback(student.id));
 
