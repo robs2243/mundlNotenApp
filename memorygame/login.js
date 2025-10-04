@@ -67,9 +67,9 @@ async function ensurePersistence() {
 }
 
 function resolveRedirectTarget() {
-    const storedTarget = sessionStorage.getItem('redirectTo');
+    const storedTarget = sessionStorage.getItem('memorygame_redirectTo');
     if (storedTarget) {
-        sessionStorage.removeItem('redirectTo');
+        sessionStorage.removeItem('memorygame_redirectTo');
         return storedTarget;
     }
 

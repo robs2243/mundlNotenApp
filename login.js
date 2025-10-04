@@ -67,9 +67,9 @@ async function ensurePersistence() {
 }
 
 function resolveRedirectTarget() {
-    const storedTarget = sessionStorage.getItem('redirectTo');
+    const storedTarget = sessionStorage.getItem('mundl_redirectTo');
     if (storedTarget) {
-        sessionStorage.removeItem('redirectTo');
+        sessionStorage.removeItem('mundl_redirectTo');
         return storedTarget;
     }
 

@@ -41,7 +41,7 @@ export class GameController {
                 this.uiManager.showStatus('Nicht eingeloggt. Weiterleitung...', 'error');
                 document.getElementById('logoutButton').disabled = true;
                 const target = window.location.pathname + window.location.search + window.location.hash;
-                sessionStorage.setItem('redirectTo', target);
+                sessionStorage.setItem('memorygame_redirectTo', target);
                 window.location.href = 'login.html';
             }
         });
